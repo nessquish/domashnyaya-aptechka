@@ -59,7 +59,7 @@ class App(QMainWindow):
         theme.set_theme(runtime.system_theme())
         self.setWindowTitle(WINDOW_TITLE)
         self.setWindowIcon(runtime.app_icon())
-        self.setMinimumSize(theme.WINDOW_WIDTH, theme.WINDOW_HEIGHT)
+        self.setMinimumSize(theme.WINDOW_MIN_WIDTH, theme.WINDOW_MIN_HEIGHT)
         self.resize(theme.WINDOW_WIDTH, theme.WINDOW_HEIGHT)
         self._stack = QStackedLayout()
         central = QWidget()
@@ -219,9 +219,9 @@ class App(QMainWindow):
         """
         screen_width, _ = runtime.screen_size()
         width = min(theme.window_width(), screen_width - 40)
-        self.setMinimumSize(width, theme.WINDOW_HEIGHT)
+        self.setMinimumSize(width, theme.WINDOW_MIN_HEIGHT)
         if self.width() < width:
-            self.resize(width, max(self.height(), theme.WINDOW_HEIGHT))
+            self.resize(width, self.height())
 
     def sign_out(self) -> None:
         """Выходит из аккаунта и возвращается на экран входа."""
@@ -230,7 +230,7 @@ class App(QMainWindow):
         self.remembered.clear()
         theme.set_theme(runtime.system_theme())
         theme.set_text_size(theme.DEFAULT_TEXT_SIZE)
-        self.setMinimumSize(theme.WINDOW_WIDTH, theme.WINDOW_HEIGHT)
+        self.setMinimumSize(theme.WINDOW_MIN_WIDTH, theme.WINDOW_MIN_HEIGHT)
         self.show_login()
 
     def _center(self) -> None:

@@ -20,6 +20,7 @@ from pharmacy.ui.widgets.page import ACTION_INSET, PageHeader
 from pharmacy.ui.widgets.select import Select
 from pharmacy.ui.widgets.sortselect import SortSelect
 from pharmacy.ui.widgets.table import Column, DataTable, TextCell
+from pharmacy.ui.widgets.wrap import TwoSideLayout
 from pharmacy.services.product_service import ProductView
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import labels, sorting
@@ -115,10 +116,15 @@ class MyKitScreen(QWidget):
     # --- панель ---
 
     def _build_toolbar(self) -> None:
-        bar = QHBoxLayout()
-        bar.setContentsMargins(
+        toolbar = QWidget()
+        wrap = TwoSideLayout(toolbar, align_right=False, gap=8 - 2 * SHADOW_PAD)
+        wrap.setContentsMargins(
             ACTION_INSET, 18 - SHADOW_PAD, ACTION_INSET, 14 - SHADOW_PAD
         )
+        # В узком окне поиск и фильтры переходят на вторую строку.
+        rest = QWidget()
+        bar = QHBoxLayout(rest)
+        bar.setContentsMargins(0, 0, 0, 0)
         bar.setSpacing(8 - 2 * SHADOW_PAD)
         self.add_button = Button(
             "Добавить товар в аптечку",
@@ -126,7 +132,7 @@ class MyKitScreen(QWidget):
             variant="primary",
             icon="plus",
         )
-        bar.addWidget(self.add_button)
+        wrap.addWidget(self.add_button)
         self._search_field = TextField(
             placeholder="Поиск по названию…",
             leading_icon="search",
@@ -149,7 +155,8 @@ class MyKitScreen(QWidget):
         self.sort_select = SortSelect(self._sort, self._on_sort)
         for select in (self.category_select, self.status_select, self.sort_select):
             bar.addWidget(select, 0, Qt.AlignmentFlag.AlignTop)
-        self._layout.addLayout(bar)
+        wrap.addWidget(rest)
+        self._layout.addWidget(toolbar)
 
     def _on_search(self) -> None:
         """Ищет с задержкой, чтобы не перерисовывать таблицу на каждую букву."""

@@ -23,8 +23,8 @@ class LoginScreenTest(AppTestCase):
         self.assertIsNone(self.app.user)
 
     def test_window_has_design_size(self):
-        self.assertEqual(self.app.minimumWidth(), theme.WINDOW_WIDTH)
-        self.assertEqual(self.app.minimumHeight(), theme.WINDOW_HEIGHT)
+        self.assertEqual(self.app.minimumWidth(), theme.WINDOW_MIN_WIDTH)
+        self.assertEqual(self.app.minimumHeight(), theme.WINDOW_MIN_HEIGHT)
 
     def test_successful_login(self):
         self.fill("anna", "password1")

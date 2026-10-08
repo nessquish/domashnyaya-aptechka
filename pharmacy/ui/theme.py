@@ -172,7 +172,8 @@ def text_scale() -> float:
 
 def window_width() -> int:
     """Минимальная ширина окна: при крупном тексте окно шире, чтобы всё помещалось."""
-    return round(WINDOW_WIDTH * text_scale())
+    normal = TEXT_SIZES[DEFAULT_TEXT_SIZE][1]
+    return round(WINDOW_MIN_WIDTH * text_scale() / normal)
 
 
 def sidebar_width() -> int:
@@ -230,6 +231,8 @@ def hex_to_rgb(color: str) -> Tuple[int, int, int]:
 # Размеры из макета (в пикселях).
 WINDOW_WIDTH = 1160
 WINDOW_HEIGHT = 660
+WINDOW_MIN_WIDTH = 960  # окно можно сузить до половины экрана 1920×1080
+WINDOW_MIN_HEIGHT = 520
 SIDEBAR_WIDTH = 190
 CONTENT_PADDING_X = 28
 CONTENT_PADDING_Y = 22

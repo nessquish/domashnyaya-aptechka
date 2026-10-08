@@ -2,7 +2,7 @@
 
 from typing import Callable, Optional
 
-from PySide6.QtCore import QRect, Qt
+from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPalette
 from PySide6.QtWidgets import QLabel, QLayout, QSizePolicy, QWidget
 
@@ -17,6 +17,35 @@ def role_color(role: str) -> str:
 
 LABEL_BORDER = 2  # у подписи прежнего интерфейса была рамка в 2 пикселя
 LABEL_PAD = 1  # и вертикальный отступ в 1 пиксель, если его не обнулили
+
+
+class ElidedLabel(QLabel):
+    """Однострочная подпись: если места мало, текст обрезается многоточием.
+
+    Подпись может сжиматься уже своего текста, поэтому длинные названия не
+    растягивают окно и оно спокойно уменьшается (например, до половины экрана).
+    """
+
+    MIN_WIDTH = 36
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        return QSize(min(hint.width(), self.MIN_WIDTH), hint.height())
+
+    def paintEvent(self, event) -> None:
+        area = self.contentsRect()
+        metrics = self.fontMetrics()
+        full = metrics.horizontalAdvance(self.text())
+        if full <= area.width() or self.wordWrap():
+            super().paintEvent(event)
+            return
+        painter = QPainter(self)
+        painter.setFont(self.font())
+        painter.setPen(self.palette().color(QPalette.ColorRole.WindowText))
+        shown = metrics.elidedText(
+            self.text(), Qt.TextElideMode.ElideRight, area.width()
+        )
+        painter.drawText(area, int(self.alignment()), shown)
 
 
 def pad(
@@ -61,7 +90,7 @@ def label(
         bare: Совсем без отступов (текст, который в макете нарисован прямо на
             полотне, например в шапке таблицы).
     """
-    result = QLabel(text, parent)
+    result = QLabel(text, parent) if wrap else ElidedLabel(text, parent)
     result.setProperty("line_height", 0 if wrap else line_height(style))
     result.setProperty("side_pad", 0 if bare else LABEL_BORDER)
     result.setProperty(
