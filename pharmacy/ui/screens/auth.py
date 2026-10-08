@@ -26,8 +26,8 @@ HERO_STRETCH = 44  # левая панель занимает 44% окна, фо
 FORM_STRETCH = 56
 HERO_TEXT_WIDTH = 270
 HERO_ICON_SIZE = 60
-FORM_WIDTH = 350
-FORM_PADDING_X = 34
+FORM_WIDTH = 440
+FORM_PADDING_X = 44
 GRADIENT_ANGLE = 160.0
 CHECK_SIZE = 14
 CHECK_GAP = 8
@@ -214,7 +214,7 @@ class LoginScreen(_AuthScreen):
             ),
             title="Вход в систему",
             subtitle="Введите свои данные, чтобы продолжить",
-            padding_y=30,
+            padding_y=44,
             header_gaps=(18, 6, 20),
         )
         self._add_field("login", TextField("Логин / Эл. почта"), gap=8)
