@@ -8,6 +8,7 @@ from pharmacy.db.seed import (
     DEMO_PRODUCTS,
     seed_bulk,
     seed_demo,
+    seed_full,
 )
 from pharmacy.utils.security import verify_password
 from tests.helpers import DatabaseTestCase
@@ -80,3 +81,65 @@ class BulkDataTest(DatabaseTestCase):
             row["expiry_date"] for row in self.db.fetch_all("SELECT * FROM products")
         ]
         self.assertEqual(first, second)
+
+
+class SeedFullTest(DatabaseTestCase):
+    """Полный набор покрывает все состояния, действия истории и уведомления."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user_id = seed_demo(self.db)
+        self.assertTrue(seed_full(self.db, self.user_id))
+
+    def test_second_run_adds_nothing(self):
+        before = self.count_rows("products")
+        self.assertFalse(seed_full(self.db, self.user_id))
+        self.assertEqual(self.count_rows("products"), before)
+
+    def test_every_product_status_is_present(self):
+        from pharmacy.services.container import build_services
+        from pharmacy.services.status import ProductStatus
+
+        views = build_services(self.db).products.list_products(self.user_id)
+        seen = {status for view in views for status in view.statuses}
+        self.assertEqual(seen, set(ProductStatus))
+        self.assertTrue(any(len(v.statuses) > 1 for v in views))
+        self.assertTrue(any(v.product.expiry_date is None for v in views))
+
+    def test_every_category_and_unit_is_used(self):
+        categories = self.db.fetch_one(
+            "SELECT COUNT(DISTINCT category_id) AS n FROM products"
+        )["n"]
+        units = {r["unit"] for r in self.db.fetch_all("SELECT unit FROM products")}
+        self.assertEqual(categories, 4)
+        self.assertEqual(units, {"шт.", "упак.", "табл.", "мг", "г", "мл", "фл."})
+
+    def test_every_history_action_is_present(self):
+        actions = {r["action"] for r in self.db.fetch_all("SELECT action FROM history")}
+        self.assertEqual(
+            actions,
+            {
+                "product_added",
+                "product_updated",
+                "product_deleted",
+                "shopping_added",
+                "shopping_bought",
+                "shopping_removed",
+            },
+        )
+
+    def test_every_notification_kind_read_and_unread(self):
+        rows = self.db.fetch_all("SELECT kind, is_read FROM notifications")
+        self.assertEqual(
+            {r["kind"] for r in rows}, {"expired", "expiring", "low_stock"}
+        )
+        self.assertEqual({r["is_read"] for r in rows}, {0, 1})
+
+    def test_shopping_has_every_kind(self):
+        rows = self.db.fetch_all(
+            "SELECT source, is_bought, product_id FROM shopping_list"
+        )
+        self.assertEqual({r["source"] for r in rows}, {"manual", "notification"})
+        self.assertEqual({r["is_bought"] for r in rows}, {0, 1})
+        self.assertTrue(any(r["product_id"] is None for r in rows))
+        self.assertTrue(any(r["product_id"] is not None for r in rows))
