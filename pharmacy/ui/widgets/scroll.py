@@ -38,7 +38,8 @@ class ScrollArea(QScrollArea):
         pal = palette()
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setWidgetResizable(True)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Полоса снизу нужна только в узком окне, когда открыто боковое меню.
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         thumb = mix(pal.line, pal.ink_3, 0.55)
         self.setStyleSheet(
@@ -53,6 +54,17 @@ class ScrollArea(QScrollArea):
             "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
             " height: 0; }"
             "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {"
+            " background: transparent; }"
+            "QAbstractScrollArea::corner { background: transparent; }"
+            "QScrollBar:horizontal {"
+            f" background: transparent; height: {THUMB_WIDTH + 2 * THUMB_MARGIN}px;"
+            " margin: 0; }"
+            "QScrollBar::handle:horizontal {"
+            f" background: {thumb}; border-radius: {THUMB_WIDTH // 2}px;"
+            f" min-width: {MIN_THUMB}px; margin: {THUMB_MARGIN}px 0; }}"
+            "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {"
+            " width: 0; }"
+            "QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {"
             " background: transparent; }"
         )
         self.verticalScrollBar().setSingleStep(WHEEL_STEP)

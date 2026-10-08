@@ -107,7 +107,7 @@ class MainShell(QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(0)
         self._narrow = False  # окно уже порога: панель прячется сама
-        self._drawer_open = False  # в узком окне панель открывают поверх содержимого
+        self._drawer_open = False  # в узком окне панель открывают кнопкой
         self._sidebar = Sidebar(
             self.user,
             sections.ALL,
@@ -162,36 +162,28 @@ class MainShell(QWidget):
             self._narrow = narrow
             self._drawer_open = False
             self._place_sidebar()
-        elif self._narrow:
-            self._sidebar.setGeometry(0, 0, theme.sidebar_width(), self.height())
         fit = getattr(self._current, "fit_rows", None)
         if fit is not None:
             QTimer.singleShot(0, fit)
 
     def _place_sidebar(self) -> None:
-        """Ставит панель в ряд (широкое окно) или поверх содержимого (узкое)."""
+        """Прячет или показывает панель после смены ширины окна."""
         if self._narrow:
-            self._row.removeWidget(self._sidebar)
-            self._sidebar.setParent(self)
-            self._rail.setVisible(True)
             self._show_drawer(self._drawer_open)
             return
-        self._sidebar.setParent(None)
-        self._row.insertWidget(0, self._sidebar)
         self._sidebar.setVisible(not self._collapsed)
         self._rail.setVisible(self._collapsed)
 
     def _show_drawer(self, opened: bool) -> None:
+        """В узком окне панель открывается в ряд и сдвигает содержимое."""
         self._drawer_open = opened
-        self._sidebar.setGeometry(0, 0, theme.sidebar_width(), self.height())
         self._sidebar.setVisible(opened)
-        if opened:
-            self._sidebar.raise_()
+        self._rail.setVisible(not opened)
 
     def set_sidebar_collapsed(self, collapsed: bool) -> None:
         """Сворачивает или разворачивает боковую панель и запоминает выбор.
 
-        В узком окне панель выезжает поверх содержимого и выбор не запоминается.
+        В узком окне панель открывается в ряд, выбор не запоминается.
         """
         if self._narrow:
             self._show_drawer(not collapsed)

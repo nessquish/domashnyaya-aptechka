@@ -140,7 +140,7 @@ class NarrowWindowTest(ShellTestCase):
             self.app.preferences.get(self.app.user.id, "sidebar_collapsed", False)
         )
 
-    def test_drawer_opens_over_content_and_closes_on_navigation(self):
+    def test_drawer_pushes_content_and_closes_on_navigation(self):
         self.app.resize(900, 640)
         self.settle()
         self.shell.set_sidebar_collapsed(False)
