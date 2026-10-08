@@ -6,6 +6,7 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QMainWindow, QStackedLayout, QWidget
 
 from pharmacy.db.connection import Database
+from pharmacy.errors import NotFoundError
 from pharmacy.models import User
 from pharmacy.ui import runtime
 from pharmacy.ui.screens.auth import LoginScreen, RegisterScreen
@@ -14,6 +15,7 @@ from pharmacy.services.container import Services, build_services
 from pharmacy.ui import sections, theme
 from pharmacy.ui.scaling import apply_scale_factor
 from pharmacy.ui.preferences import Preferences
+from pharmacy.ui.remember import REMEMBER_FILE, RememberedLogin
 
 WINDOW_TITLE = "Моя аптечка"
 PREFERENCES_FILE = "preferences.json"  # лежит рядом с файлом базы
@@ -31,7 +33,10 @@ class App(QMainWindow):
     """
 
     def __init__(
-        self, services: Services, preferences: Optional[Preferences] = None
+        self,
+        services: Services,
+        preferences: Optional[Preferences] = None,
+        remembered: Optional[RememberedLogin] = None,
     ) -> None:
         """Создаёт окно по размеру макета и показывает экран входа.
 
@@ -44,6 +49,7 @@ class App(QMainWindow):
         super().__init__()
         self.services = services
         self.preferences = preferences or Preferences()
+        self.remembered = remembered or RememberedLogin()
         self.user: Optional[User] = None
         self.session_password = ""
         self._screen: Optional[QWidget] = None
@@ -99,19 +105,42 @@ class App(QMainWindow):
         """Показывает экран регистрации."""
         self.show_screen(RegisterScreen)
 
-    def sign_in(self, user: User, password: str = "") -> None:
+    def sign_in(self, user: User, password: str = "", remember: bool = False) -> None:
         """Запоминает вошедшего пользователя, применяет его тему и открывает аптечку.
 
         Args:
             user: Вошедший пользователь.
             password: Пароль, который он ввёл. Хранится только в памяти до
                 выхода (для показа в настройках), на диск не записывается.
+            remember: Запомнить устройство на 30 дней.
         """
+        if remember:
+            self.remembered.remember(user.id, user.password_hash)
         self.user = user
         self.session_password = password
         self._apply_view_settings(user)
         self.services.notifications.refresh(user.id)
         self.show_screen(MainShell)
+
+    def restore_session(self) -> bool:
+        """Входит без пароля, если устройство запомнено и срок не истёк.
+
+        Returns:
+            True, если вход выполнен.
+        """
+        user_id = self.remembered.user_id()
+        if user_id is None:
+            return False
+        try:
+            user = self.services.settings.get_user(user_id)
+        except NotFoundError:
+            self.remembered.clear()
+            return False
+        if not self.remembered.matches(user.password_hash):
+            self.remembered.clear()
+            return False
+        self.sign_in(user)
+        return True
 
     def apply_user_changes(
         self, user: User, notice: str = "", start: str = sections.SETTINGS
@@ -154,6 +183,7 @@ class App(QMainWindow):
         """Выходит из аккаунта и возвращается на экран входа."""
         self.user = None
         self.session_password = ""
+        self.remembered.clear()
         theme.set_theme(theme.LIGHT_THEME)
         theme.set_text_size(theme.DEFAULT_TEXT_SIZE)
         self.setMinimumSize(theme.WINDOW_WIDTH, theme.WINDOW_HEIGHT)
@@ -179,6 +209,8 @@ def run(db: Optional[Database] = None) -> None:
     db = db or Database()
     db.init_schema()
     preferences = Preferences(db.path.parent / PREFERENCES_FILE)
-    window = App(build_services(db), preferences)
+    remembered = RememberedLogin(db.path.parent / REMEMBER_FILE)
+    window = App(build_services(db), preferences, remembered)
+    window.restore_session()
     window.show()
     application.exec()

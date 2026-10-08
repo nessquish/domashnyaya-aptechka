@@ -13,6 +13,7 @@ from pharmacy.ui.widgets.banner import ErrorBanner
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
 from pharmacy.ui.widgets.common import label, pad
+from pharmacy.ui.widgets.controls import Checkbox
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.link import Link
 from pharmacy.ui import theme
@@ -219,10 +220,23 @@ class LoginScreen(_AuthScreen):
         )
         self._add_field("login", TextField("Логин / Эл. почта"), gap=8)
         self._add_field("password", TextField("Пароль", password=True), gap=8)
+        self._add_remember()
         self._add_footer(
             "Войти", "Нет аккаунта?", "Зарегистрироваться", app.show_register
         )
         self._fields["login"].focus_field()
+
+    def _add_remember(self) -> None:
+        """Добавляет галочку «Запомнить это устройство 30 дней»."""
+        row = QHBoxLayout()
+        row.setContentsMargins(SHADOW_PAD, 2, SHADOW_PAD, 0)
+        row.setSpacing(8)
+        self._remember = Checkbox(False)
+        row.addWidget(self._remember)
+        row.addWidget(label("Запомнить это устройство 30 дней", "small", "ink_2"))
+        row.addStretch(1)
+        self._form.addLayout(row)
+        self._form.addSpacing(10)
 
     def _submit(self) -> None:
         self._reset_errors()
@@ -238,7 +252,7 @@ class LoginScreen(_AuthScreen):
             self._fields[error.field or "password"].set_error()
             self._fields[error.field or "password"].focus_field()
         else:
-            self._app.sign_in(user, password)
+            self._app.sign_in(user, password, self._remember.value)
 
 
 class RegisterScreen(_AuthScreen):

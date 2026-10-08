@@ -162,7 +162,7 @@ class SettingsScreen(QWidget):
             "Текущий пароль",
             placeholder="••••••••",
             password=True,
-            readonly=True,
+            readonly=bool(self._shell.app.session_password),
         )
         current.set(self._shell.app.session_password)
         self._field(
@@ -313,10 +313,10 @@ class SettingsScreen(QWidget):
         if not (new or repeat):
             return
         app = self._shell.app
-        self._services.auth.change_password(
-            self._user.id, app.session_password, new, repeat
-        )
+        old = app.session_password or self._fields["old_password"].get()
+        self._services.auth.change_password(self._user.id, old, new, repeat)
         app.session_password = new
+        app.remembered.clear()
 
     def _show_error(self, error: ValidationError) -> None:
         if error.field == "warning_days":
