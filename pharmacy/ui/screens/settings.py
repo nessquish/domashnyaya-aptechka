@@ -1,12 +1,15 @@
 """Экран «Настройки»: слева список разделов, справа содержимое выбранного."""
 
+import os
+import sys
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
-from PySide6.QtCore import QPoint, Qt, QTimer, QUrl
+from PySide6.QtCore import QPoint, QProcess, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
+    QApplication,
     QLabel,
     QVBoxLayout,
     QWidget,
@@ -293,7 +296,7 @@ class SettingsScreen(QWidget):
     @staticmethod
     def _scale_text(mode: str) -> str:
         if mode == "manual":
-            return "Задан вручную, применится после перезапуска"
+            return "Задан вручную, применяется после перезапуска"
         return "Подбирается по разрешению и DPI экрана"
 
     def _build_slider(self, visible: bool) -> None:
@@ -328,12 +331,36 @@ class SettingsScreen(QWidget):
             self._prefs.set(GLOBAL_USER, SCALE_PERCENT, self._slider.value)
         self._slider_row.setVisible(mode == "manual")
         self._scale_hint.setText(self._scale_text(mode))
+        if mode == "auto":
+            self._ask_restart()
 
     def _on_slider(self, value: int) -> None:
         self._percent.setText(f"{value}%")
 
     def _on_slider_done(self, value: int) -> None:
         self._prefs.set(GLOBAL_USER, SCALE_PERCENT, value)
+        if value != round(scaling.scale_factor() * 100):
+            self._ask_restart()
+
+    def _ask_restart(self) -> None:
+        Dialog(
+            self._app,
+            "Применить масштаб?",
+            "Масштаб меняется только при запуске. Перезапустить программу сейчас? "
+            "Если устройство не запомнено, войти нужно будет заново.",
+            "Перезапустить",
+            self._restart,
+            cancel_text="Позже",
+            width=420,
+        )
+
+    def _restart(self) -> None:
+        """Запускает программу заново (с новым масштабом) и закрывает эту."""
+        # Масштаб текущего запуска не должен попасть в новый: он считается заново.
+        os.environ.pop(scaling.ENV_NAME, None)
+        args = [] if getattr(sys, "frozen", False) else ["-m", "pharmacy"]
+        QProcess.startDetached(sys.executable, args)
+        QApplication.quit()
 
     def _on_text_size(self, index: int) -> None:
         self._remember_section()

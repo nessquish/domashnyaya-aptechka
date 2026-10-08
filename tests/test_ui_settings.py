@@ -384,3 +384,33 @@ class ReopenTest(SettingsTestCase):
         self.page._rebuild()
         self.settle()
         self.assertEqual(self.page.section, NOTIFICATIONS)
+
+
+class ScaleRestartTest(SettingsTestCase):
+    def test_new_scale_offers_a_restart(self):
+        page = self.section(APPEARANCE)
+        page._on_slider_done(130)
+        self.settle()
+        self.assertEqual(self.app.preferences.get(GLOBAL_USER, SCALE_PERCENT), 130)
+        self.assertTrue(self.buttons("Перезапустить"))
+
+    def test_restart_starts_a_new_process_without_the_old_scale(self):
+        import os
+
+        os.environ["QT_SCALE_FACTOR"] = "0.8"
+        page = self.section(APPEARANCE)
+        with mock.patch(
+            "pharmacy.ui.screens.settings.QProcess.startDetached"
+        ) as start, mock.patch(
+            "pharmacy.ui.screens.settings.QApplication.quit"
+        ) as quit_:
+            page._restart()
+        self.assertNotIn("QT_SCALE_FACTOR", os.environ)
+        self.assertEqual(start.call_args[0][1], ["-m", "pharmacy"])
+        quit_.assert_called_once()
+
+    def test_back_to_auto_offers_a_restart(self):
+        page = self.section(APPEARANCE)
+        page._on_scale_mode(0)
+        self.settle()
+        self.assertTrue(self.buttons("Перезапустить"))
