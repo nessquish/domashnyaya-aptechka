@@ -23,7 +23,11 @@ SECTION_PADDING_X = 20
 SECTION_PADDING_Y = 18
 CARD_GAP = 16 - 2 * CARD_SHADOW_PAD
 FIELD_GAP = 2  # 10 px по макету минус поля под тень у соседних полей
-THEMES = ((theme.LIGHT_THEME, "Светлая"), (theme.DARK_THEME, "Тёмная"))
+THEMES = (
+    (theme.LIGHT_THEME, "Светлая"),
+    (theme.DARK_THEME, "Тёмная"),
+    ("system", "Системная"),
+)
 DAYS_FIELD_WIDTH = 56
 NOTICE_MS = 3000
 SAVED = "Изменения сохранены"
@@ -211,7 +215,8 @@ class SettingsScreen(QWidget):
         card, inner = self._section("Оформление", "Внешний вид приложения")
         row, _ = self._row(inner, "Тема", first=True)
         names = [name for _key, name in THEMES]
-        current = [key for key, _name in THEMES].index(self._user.theme)
+        mode = self._shell.app.theme_mode(self._user)
+        current = [key for key, _name in THEMES].index(mode)
         self._theme = Segmented(
             names,
             current,
@@ -289,7 +294,7 @@ class SettingsScreen(QWidget):
             settings.update_settings(
                 user_id,
                 self._days.get(),
-                THEMES[self._theme.active][0],
+                theme.theme_name(),
                 self._expired.value,
                 self._low.value,
             )

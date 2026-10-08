@@ -2,6 +2,7 @@
 
 from typing import Callable, Optional
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QMainWindow, QStackedLayout, QWidget
 
@@ -10,7 +11,7 @@ from pharmacy.errors import NotFoundError
 from pharmacy.models import User
 from pharmacy.ui import runtime
 from pharmacy.ui.screens.auth import LoginScreen, RegisterScreen
-from pharmacy.ui.screens.shell import TEXT_SIZE, MainShell
+from pharmacy.ui.screens.shell import TEXT_SIZE, THEME_MODE, MainShell
 from pharmacy.services.container import Services, build_services
 from pharmacy.ui import sections, theme
 from pharmacy.ui.scaling import apply_scale_factor
@@ -18,6 +19,8 @@ from pharmacy.ui.preferences import Preferences
 from pharmacy.ui.remember import REMEMBER_FILE, RememberedLogin
 
 WINDOW_TITLE = "Моя аптечка"
+SYSTEM_THEME = "system"
+SYSTEM_THEME_CHECK_MS = 2000
 PREFERENCES_FILE = "preferences.json"  # лежит рядом с файлом базы
 ScreenFactory = Callable[["App"], QWidget]
 
@@ -162,12 +165,52 @@ class App(QMainWindow):
 
     def _apply_view_settings(self, user: User) -> None:
         """Включает тему и размер текста пользователя до построения экранов."""
-        theme.set_theme(user.theme)
+        theme.set_theme(self.resolve_theme(user))
         size = self.preferences.get(user.id, TEXT_SIZE, theme.DEFAULT_TEXT_SIZE)
         theme.set_text_size(
             size if size in theme.TEXT_SIZES else theme.DEFAULT_TEXT_SIZE
         )
         self._fit_window()
+
+    def theme_mode(self, user: User) -> str:
+        """Выбор темы пользователя: ``light``, ``dark`` или ``system``."""
+        mode = self.preferences.get(user.id, THEME_MODE, user.theme)
+        return (
+            mode
+            if mode in (theme.LIGHT_THEME, theme.DARK_THEME, SYSTEM_THEME)
+            else user.theme
+        )
+
+    def resolve_theme(self, user: User) -> str:
+        """Тема, которую нужно показать: при выборе «Системная» берётся тема системы."""
+        mode = self.theme_mode(user)
+        return runtime.system_theme() if mode == SYSTEM_THEME else mode
+
+    def watch_system_theme(self) -> None:
+        """Раз в пару секунд проверяет тему системы и подстраивает окно."""
+        self._system_timer = QTimer(self)
+        self._system_timer.setInterval(SYSTEM_THEME_CHECK_MS)
+        self._system_timer.timeout.connect(self._follow_system_theme)
+        self._system_timer.start()
+
+    def _follow_system_theme(self) -> None:
+        wanted = runtime.system_theme()
+        if self.user is None:
+            if theme.theme_name() != wanted:
+                theme.set_theme(wanted)
+                self.show_screen(type(self._screen))
+            return
+        if self.theme_mode(self.user) != SYSTEM_THEME or theme.theme_name() == wanted:
+            return
+        user = self.services.settings.update_settings(
+            self.user.id,
+            str(self.user.warning_days),
+            wanted,
+            self.user.notify_expired,
+            self.user.notify_low_stock,
+        )
+        section = self._screen.section if hasattr(self._screen, "section") else None
+        self.apply_user_changes(user, start=section or sections.SETTINGS)
 
     def _fit_window(self) -> None:
         """Подгоняет минимальную ширину окна под размер текста.
@@ -213,5 +256,6 @@ def run(db: Optional[Database] = None) -> None:
     remembered = RememberedLogin(db.path.parent / REMEMBER_FILE)
     window = App(build_services(db), preferences, remembered)
     window.restore_session()
+    window.watch_system_theme()
     window.show()
     application.exec()

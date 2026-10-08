@@ -18,7 +18,7 @@ from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.link import Link
 from pharmacy.ui import theme
 from pharmacy.ui.field_check import LiveCheck, email_error, login_error
-from pharmacy.ui.theme import SHADOW_PAD, palette
+from pharmacy.ui.theme import SHADOW_PAD, mix, palette
 
 if TYPE_CHECKING:
     from pharmacy.ui.app import App
@@ -30,6 +30,7 @@ HERO_ICON_SIZE = 60
 FORM_WIDTH = 440
 FORM_PADDING_X = 44
 GRADIENT_ANGLE = 160.0
+HERO_SOFTEN = 0.6  # доля цвета фона в цветах градиента: чем больше, тем слабее
 FADE_SHARE = 0.5  # какая часть левой панели справа уходит в цвет фона
 CHECK_SIZE = 14
 CHECK_GAP = 8
@@ -92,8 +93,9 @@ class _HeroPanel(QWidget):
         center = QPointF(width / 2, height / 2)
         shift = QPointF(dx * length / 2, dy * length / 2)
         gradient = QLinearGradient(center - shift, center + shift)
-        gradient.setColorAt(0, QColor(pal.hero_from))
-        gradient.setColorAt(1, QColor(pal.hero_to))
+        # Градиент едва заметный: цвета панели ближе к фону окна.
+        gradient.setColorAt(0, QColor(mix(pal.hero_from, pal.bg, HERO_SOFTEN)))
+        gradient.setColorAt(1, QColor(mix(pal.hero_to, pal.bg, HERO_SOFTEN)))
         painter = QPainter(self)
         painter.fillRect(self.rect(), gradient)
         # Плавный переход к фону правой половины, без резкой границы.

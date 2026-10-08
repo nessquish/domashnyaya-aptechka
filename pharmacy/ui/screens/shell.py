@@ -33,6 +33,7 @@ ScreenFactory = Callable[["MainShell"], QWidget]
 RAIL_WIDTH = 44  # ширина полосы, которая остаётся от свёрнутой боковой панели
 SIDEBAR_COLLAPSED = "sidebar_collapsed"  # ключи в предпочтениях пользователя
 TEXT_SIZE = "text_size"
+THEME_MODE = "theme_mode"  # light, dark или system (как в операционной системе)
 
 # Содержимое окна отступает от краёв на отступ макета минус поле под тень карточек.
 CONTENT_PADDING_X = theme.CONTENT_PADDING_X - CARD_SHADOW_PAD
@@ -267,20 +268,24 @@ class MainShell(QWidget):
         Окно строится заново на том же разделе: цвета читаются при создании
         виджетов.
         """
-        if name == self.user.theme:
+        if name == self.app.theme_mode(self.user):
             return
-        user = self.services.settings.update_settings(
-            self.user.id,
-            str(self.user.warning_days),
-            name,
-            self.user.notify_expired,
-            self.user.notify_low_stock,
-        )
+        self.app.preferences.set(self.user.id, THEME_MODE, name)
+        resolved = self.app.resolve_theme(self.user)
+        user = self.user
+        if resolved != user.theme:
+            user = self.services.settings.update_settings(
+                user.id,
+                str(user.warning_days),
+                resolved,
+                user.notify_expired,
+                user.notify_low_stock,
+            )
         self.app.apply_user_changes(user, start=self.section)
 
     def toggle_theme(self) -> None:
         """Переключает светлую и тёмную тему."""
-        dark = self.user.theme == theme.DARK_THEME
+        dark = theme.theme_name() == theme.DARK_THEME
         self.set_theme(theme.LIGHT_THEME if dark else theme.DARK_THEME)
 
     def take_notice(self) -> str:

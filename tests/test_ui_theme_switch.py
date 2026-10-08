@@ -90,3 +90,46 @@ class DarkPaletteScreenshotTest(ShellTestCase):
         image = card.grab().toImage()
         center = image.pixelColor(card.width() // 2, card.height() // 2)
         self.assertEqual(center.name().upper(), theme.DARK.card.upper())
+
+
+class SystemThemeTest(ShellTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        from pharmacy.ui import runtime
+
+        self.system = "dark"
+        original = runtime.system_theme
+        runtime.system_theme = lambda: self.system
+        self.addCleanup(setattr, runtime, "system_theme", original)
+
+    def choose_system(self):
+        self.shell.set_theme("system")
+        self.settle()
+
+    def test_system_choice_follows_the_system(self):
+        self.choose_system()
+        self.assertEqual(theme.theme_name(), "dark")
+        self.assertEqual(self.app.theme_mode(self.app.user), "system")
+
+    def test_system_change_is_picked_up(self):
+        self.choose_system()
+        self.system = "light"
+        self.app._follow_system_theme()
+        self.settle()
+        self.assertEqual(theme.theme_name(), "light")
+        self.assertEqual(self.app.theme_mode(self.app.user), "system")
+
+    def test_fixed_choice_ignores_the_system(self):
+        self.shell.set_theme("light")
+        self.settle()
+        self.app._follow_system_theme()
+        self.assertEqual(theme.theme_name(), "light")
+
+    def test_login_screen_follows_the_system(self):
+        self.app.sign_out()
+        self.settle()
+        self.assertEqual(theme.theme_name(), "dark")
+        self.system = "light"
+        self.app._follow_system_theme()
+        self.settle()
+        self.assertEqual(theme.theme_name(), "light")

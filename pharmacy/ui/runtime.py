@@ -1,5 +1,6 @@
 """Запуск Qt: приложение, шрифты, русский язык стандартных окон и значок."""
 
+import sys
 from typing import Optional
 
 from PySide6.QtCore import QCoreApplication, QLibraryInfo, QLocale, QTranslator, Qt
@@ -44,8 +45,25 @@ def _setup(app: QApplication) -> None:
 
 
 def system_theme() -> str:
-    """Тема операционной системы: ``light`` или ``dark`` (определена при запуске)."""
-    application()
+    """Тема операционной системы сейчас: ``light`` или ``dark``.
+
+    В Windows читается настройка системы, поэтому смена темы замечается без
+    перезапуска. На других системах берётся тема, найденная при запуске.
+    """
+    app = application()
+    if sys.platform == "win32" and app.platformName() != "offscreen":
+        try:
+            import winreg
+
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            )
+            with key:
+                light, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+            return "light" if light else "dark"
+        except OSError:
+            pass
     return _system_theme
 
 
