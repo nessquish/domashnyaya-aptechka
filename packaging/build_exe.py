@@ -4,7 +4,12 @@
 
     .venv\\Scripts\\python.exe packaging\\build_exe.py
 
-Результат: ``dist/Aptechka.exe``. Файл можно скопировать на другой компьютер с
+Результат: ``dist/Aptechka.exe``. С ключом ``--demo`` собирается
+``dist/Aptechka-Demo.exe``: при первом запуске в нём уже есть тестовый аккаунт
+``nessquish`` (пароль ``demo12345``) со всеми видами данных, а данные лежат
+отдельно в ``%LOCALAPPDATA%\\Моя аптечка (демо)``.
+
+Обычная сборка: Файл можно скопировать на другой компьютер с
 Windows: Python на нём не нужен. Данные программы (база и настройки) хранятся
 в ``%LOCALAPPDATA%\\Моя аптечка`` и сохраняются между запусками.
 """
@@ -27,6 +32,7 @@ ICON_FILE = BUILD_DIR / "aptechka.ico"
 ENTRY = ROOT / "packaging" / "launcher.py"
 FONTS = ROOT / "pharmacy" / "ui" / "assets" / "fonts"
 EXE_NAME = "Aptechka"
+DEMO_FLAG_FILE = BUILD_DIR / "demo.flag"
 
 
 def make_icon() -> Path:
@@ -42,14 +48,19 @@ def make_icon() -> Path:
     return ICON_FILE
 
 
-def build() -> None:
-    """Запускает PyInstaller."""
+def build(demo: bool = False) -> None:
+    """Запускает PyInstaller (demo: сборка с тестовым аккаунтом)."""
     icon = make_icon()
+    extra = []
+    if demo:
+        DEMO_FLAG_FILE.write_text("demo", encoding="utf-8")
+        extra = ["--add-data", f"{DEMO_FLAG_FILE};pharmacy"]
     PyInstaller.__main__.run(
         [
             str(ENTRY),
+            *extra,
             "--name",
-            EXE_NAME,
+            EXE_NAME + ("-Demo" if demo else ""),
             "--onefile",
             "--noconsole",
             "--clean",
@@ -75,4 +86,4 @@ def build() -> None:
 
 
 if __name__ == "__main__":
-    build()
+    build(demo="--demo" in sys.argv)

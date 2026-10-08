@@ -14,6 +14,7 @@ from pharmacy.ui.screens.auth import LoginScreen, RegisterScreen
 from pharmacy.ui.screens.shell import TEXT_SIZE, THEME_MODE, MainShell
 from pharmacy.services.container import Services, build_services
 from pharmacy.ui import sections, theme
+from pharmacy.config import is_demo_build
 from pharmacy.ui.scaling import apply_scale_factor
 from pharmacy.services.notification_service import NotifyOptions
 from pharmacy.ui.preferences import (
@@ -259,6 +260,17 @@ class App(QMainWindow):
         )
 
 
+def prepare_demo(db: Database) -> None:
+    """В демо-сборке при первом запуске создаёт тестовый аккаунт со всеми данными."""
+    from pharmacy.db.seed import seed_demo, seed_full
+
+    if db.fetch_one("SELECT id FROM users LIMIT 1") is not None:
+        return
+    user_id = seed_demo(db)
+    if user_id is not None:
+        seed_full(db, user_id)
+
+
 def manual_scale(preferences: Preferences) -> Optional[float]:
     """Ручной масштаб из настроек (None, если выбран автоматический)."""
     if preferences.get(GLOBAL_USER, SCALE_MODE, "auto") != "manual":
@@ -278,6 +290,8 @@ def run(db: Optional[Database] = None) -> None:
     apply_scale_factor(manual_scale(preferences))
     application = runtime.application()
     db.init_schema()
+    if is_demo_build():
+        prepare_demo(db)
     remembered = RememberedLogin(db.path.parent / REMEMBER_FILE)
     window = App(build_services(db), preferences, remembered)
     window.restore_session()

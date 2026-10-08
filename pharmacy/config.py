@@ -8,6 +8,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 APP_FOLDER = "Моя аптечка"  # папка данных установленной программы
 
 
+# Файл-метка внутри демо-сборки .exe (кладётся туда при сборке с ключом --demo).
+DEMO_FLAG = Path(__file__).resolve().parent / "demo.flag"
+DEMO_FOLDER = "Моя аптечка (демо)"  # у демо-сборки свои данные, чужие не трогаются
+
+
+def is_demo_build() -> bool:
+    """Это демо-сборка с готовым тестовым аккаунтом."""
+    return DEMO_FLAG.is_file()
+
+
 def _default_db_path() -> Path:
     """Возвращает путь к базе по умолчанию.
 
@@ -18,7 +28,8 @@ def _default_db_path() -> Path:
     """
     if getattr(sys, "frozen", False):
         base = os.environ.get("LOCALAPPDATA") or str(Path.home())
-        return Path(base) / APP_FOLDER / "data" / "aptechka.db"
+        folder = DEMO_FOLDER if is_demo_build() else APP_FOLDER
+        return Path(base) / folder / "data" / "aptechka.db"
     return PROJECT_ROOT / "data" / "aptechka.db"
 
 
