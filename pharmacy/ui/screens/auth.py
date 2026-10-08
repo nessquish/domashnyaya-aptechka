@@ -30,6 +30,7 @@ HERO_ICON_SIZE = 60
 FORM_WIDTH = 440
 FORM_PADDING_X = 44
 GRADIENT_ANGLE = 160.0
+FADE_SHARE = 0.5  # какая часть левой панели справа уходит в цвет фона
 CHECK_SIZE = 14
 CHECK_GAP = 8
 POINT_GAP = 9
@@ -93,7 +94,16 @@ class _HeroPanel(QWidget):
         gradient = QLinearGradient(center - shift, center + shift)
         gradient.setColorAt(0, QColor(pal.hero_from))
         gradient.setColorAt(1, QColor(pal.hero_to))
-        QPainter(self).fillRect(self.rect(), gradient)
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), gradient)
+        # Плавный переход к фону правой половины, без резкой границы.
+        fade_start = width * (1 - FADE_SHARE)
+        fade = QLinearGradient(QPointF(fade_start, 0), QPointF(width, 0))
+        clear = QColor(pal.bg)
+        clear.setAlpha(0)
+        fade.setColorAt(0, clear)
+        fade.setColorAt(1, QColor(pal.bg))
+        painter.fillRect(self.rect(), fade)
 
 
 class _AuthScreen(QWidget):
