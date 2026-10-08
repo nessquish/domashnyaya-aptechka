@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Callable, List
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QSizePolicy, QHBoxLayout, QVBoxLayout, QWidget
 
 from pharmacy.ui.widgets.badge import Badge, badge_height, measure_badge
 from pharmacy.ui.widgets.button import Button, measure_button
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 STAT_GAP = 14 - 2 * CARD_SHADOW_PAD  # расстояние между карточками минус поля теней
 COLUMN_GAP = 16 - 2 * CARD_SHADOW_PAD
-LEFT_WEIGHT, RIGHT_WEIGHT = 16, 10  # колонки 1.6fr и 1fr из макета
+LEFT_WEIGHT, RIGHT_WEIGHT = 1, 1  # две колонки одинаковой ширины
 OPEN_TAB = 1  # вкладка «Не куплено» в списке покупок
 ROW_PADDING_X = 18
 ROW_PADDING_Y = 8
@@ -176,6 +176,9 @@ class DashboardScreen(QWidget):
             "Вся аптечка",
             lambda: self._shell.navigate(sections.MY_KIT),
         )
+        # Ширину колонок задают только веса: длинный текст не растягивает карточку.
+        for card in (self.attention_card, self.recent_card):
+            card.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         columns.addWidget(self.attention_card, LEFT_WEIGHT, Qt.AlignmentFlag.AlignTop)
         columns.addWidget(self.recent_card, RIGHT_WEIGHT, Qt.AlignmentFlag.AlignTop)
         self._fill_attention(self.attention_card, summary.attention)
