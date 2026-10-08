@@ -221,7 +221,7 @@ class Sidebar(QFrame):
         outer.setSpacing(0)
 
         header = QHBoxLayout()
-        header.setContentsMargins(NAV_PAD + 4, 18, NAV_PAD, 22)
+        header.setContentsMargins(NAV_PAD + 4, 18 + theme.TOP_OFFSET, NAV_PAD, 22)
         header.addWidget(label("Моя аптечка", "sidebar_title", "brand_ink"))
         header.addStretch(1)
         header.addWidget(IconButton("panel-left", on_collapse))

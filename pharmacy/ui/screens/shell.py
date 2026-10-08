@@ -48,7 +48,7 @@ class _Rail(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self.backdrop_color = palette().side
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 18, 1, 0)
+        layout.setContentsMargins(0, 18 + theme.TOP_OFFSET, 1, 0)
         layout.addWidget(
             IconButton("panel-left", on_expand), 0, Qt.AlignmentFlag.AlignHCenter
         )

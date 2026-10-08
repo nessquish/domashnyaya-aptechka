@@ -235,7 +235,8 @@ WINDOW_MIN_WIDTH = 800  # окно можно сузить до половины
 WINDOW_MIN_HEIGHT = 520
 SIDEBAR_WIDTH = 190
 CONTENT_PADDING_X = 28
-CONTENT_PADDING_Y = 22
+TOP_OFFSET = 8  # весь интерфейс опущен от шапки окна (около двух миллиметров)
+CONTENT_PADDING_Y = 22 + TOP_OFFSET
 
 CONTROL_HEIGHT = 32  # поле ввода, кнопка, выпадающий список
 CONTROL_HEIGHT_SMALL = 26
