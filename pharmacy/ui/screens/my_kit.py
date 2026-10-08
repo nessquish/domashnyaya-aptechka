@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
 PAGE_SIZE = DEFAULT_ROWS  # строк на странице, пока окно не измерено
 PAGING_KEY = "my_kit"
+FLASH_MS = 4000  # сколько держится подсветка найденного товара
 SEARCH_DELAY_MS = 250
 SORT_PREFERENCE = "kit_sort"  # выбранная сортировка запоминается для пользователя
 COLUMNS = (
@@ -79,6 +80,7 @@ class MyKitScreen(QWidget):
         self._selected: Set[int] = set()  # отмеченные товары (на всех страницах)
         self._shown_ids: List[int] = []
         self._total = 0
+        self._flash_id: Optional[int] = None  # найденная товарная строка
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(SEARCH_DELAY_MS)
@@ -247,13 +249,39 @@ class MyKitScreen(QWidget):
             QTimer.singleShot(0, self.fit_rows)
 
     def reveal(self, product_id: int) -> None:
-        """Переходит на страницу таблицы, где стоит товар (после добавления)."""
+        """Переходит на страницу таблицы, где стоит товар, и подсвечивает строку.
+
+        Нужно после добавления товара и по результату поиска. Если поиск или
+        фильтры прячут товар, они сбрасываются.
+        """
         views = self._load()
+        if all(view.product.id != product_id for view in views):
+            self._reset_filters()
+            views = self._load()
         for index, view in enumerate(views):
             if view.product.id == product_id:
                 self._page = index // self._page_size + 1
+                self._flash_id = product_id
                 self._reload()
+                QTimer.singleShot(FLASH_MS, self._clear_flash)
                 return
+
+    def _reset_filters(self) -> None:
+        self._search = ""
+        self._category = None
+        self._status = None
+        self._search_field.set("")
+        self.category_select.set(None)
+        self.status_select.set(None)
+
+    def _clear_flash(self) -> None:
+        """Снимает подсветку найденной строки (отмеченные флажком остаются)."""
+        try:
+            flashed, self._flash_id = self._flash_id, None
+            if flashed in self._shown_ids and flashed not in self._selected:
+                self._table.set_row_selected(self._shown_ids.index(flashed), False)
+        except RuntimeError:  # экран уже закрыт
+            pass
 
     # --- таблица ---
 
@@ -321,7 +349,7 @@ class MyKitScreen(QWidget):
                 pid = view.product.id
                 self._table.add_row(
                     self._cells(view),
-                    pid in self._selected,
+                    pid in self._selected or pid == self._flash_id,
                     check=lambda i=pid: Checkbox(
                         i in self._selected, lambda v, i=i: self._toggle(i, v)
                     ),

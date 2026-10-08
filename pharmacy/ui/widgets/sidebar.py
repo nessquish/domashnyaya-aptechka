@@ -209,6 +209,7 @@ class Sidebar(QFrame):
         parent: Optional[QWidget] = None,
         icons: Optional[Dict[str, str]] = None,
         on_profile: Optional[Callable[[], None]] = None,
+        on_search: Optional[Callable[[], None]] = None,
     ) -> None:
         """Создаёт меню.
 
@@ -222,6 +223,7 @@ class Sidebar(QFrame):
             parent: Родитель.
             icons: Значки пунктов по названию раздела (None: без значков).
             on_profile: Вызывается при нажатии на аватар и имя пользователя.
+            on_search: Вызывается при нажатии на лупу (поиск по программе).
         """
         super().__init__(parent)
         pal = palette()
@@ -242,6 +244,11 @@ class Sidebar(QFrame):
         header.addStretch(1)
         header.addWidget(IconButton("panel-left", on_collapse))
         outer.addLayout(header)
+
+        if on_search is not None:
+            # Поиск по программе (Ctrl+F): первый пункт над разделами.
+            self.search_button = NavItem("Поиск", on_search, icon="search")
+            outer.addWidget(self.search_button)
 
         self._items: Dict[str, NavItem] = {}
         for name in sections:

@@ -371,6 +371,41 @@ class ProductService:
             changed += 1
         return changed
 
+    def search_products(
+        self, user_id: int, query: str, limit: int = 10
+    ) -> List[Product]:
+        """Ищет товары по названию, категории и примечанию (для поиска по программе).
+
+        Сначала идут товары, у которых название начинается с запроса, затем те,
+        где запрос внутри названия, и последними совпавшие по категории или
+        примечанию. Регистр букв не важен.
+
+        Args:
+            user_id: Владелец товаров.
+            query: Введённый текст.
+            limit: Сколько товаров вернуть не больше.
+        """
+        needle = query.strip().casefold()
+        if not needle:
+            return []
+        ranked = []
+        for product in self._products.list_for_user(user_id):
+            name = product.name.casefold()
+            if name.startswith(needle):
+                rank = 0
+            elif needle in name:
+                rank = 1
+            elif (
+                needle in (product.category_name or "").casefold()
+                or needle in (product.note or "").casefold()
+            ):
+                rank = 2
+            else:
+                continue
+            ranked.append((rank, name, product))
+        ranked.sort(key=lambda item: (item[0], item[1]))
+        return [product for _rank, _name, product in ranked[:limit]]
+
     def get_product(
         self, user_id: int, product_id: int, today: Optional[date] = None
     ) -> ProductView:

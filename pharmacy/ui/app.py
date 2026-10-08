@@ -3,7 +3,7 @@
 from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QKeySequence, QPalette, QShortcut
 from PySide6.QtWidgets import QMainWindow, QStackedLayout, QWidget
 
 from pharmacy.db.connection import Database
@@ -11,7 +11,9 @@ from pharmacy.errors import NotFoundError
 from pharmacy.models import User
 from pharmacy.ui import runtime
 from pharmacy.ui.screens.auth import LoginScreen, RegisterScreen
+from pharmacy.ui.screens.search import SearchModal
 from pharmacy.ui.screens.shell import TEXT_SIZE, THEME_MODE, MainShell
+from pharmacy.ui.search_index import Target
 from pharmacy.services.container import Services, build_services
 from pharmacy.ui import sections, theme
 from pharmacy.config import is_demo_build
@@ -61,6 +63,7 @@ class App(QMainWindow):
         self.preferences = preferences or Preferences()
         self.remembered = remembered or RememberedLogin()
         self.reopen_settings: Optional[str] = None  # раздел настроек после пересборки
+        self.search_modal: Optional[SearchModal] = None
         services.notifications.options_for = self.notify_options
         self.user: Optional[User] = None
         self.session_password = ""
@@ -76,6 +79,9 @@ class App(QMainWindow):
         self.setCentralWidget(central)
         self._paint_background()
         self._center()
+        # Ctrl+F: на русской раскладке та же клавиша даёт букву «А».
+        for keys in ("Ctrl+F", "Ctrl+А"):
+            QShortcut(QKeySequence(keys), self, activated=self.open_search)
         self.show_login()
 
     @property
@@ -180,6 +186,19 @@ class App(QMainWindow):
             size if size in theme.TEXT_SIZES else theme.DEFAULT_TEXT_SIZE
         )
         self._fit_window()
+
+    def open_search(self) -> None:
+        """Открывает окно поиска по программе (только после входа)."""
+        if self.user is None or not isinstance(self._screen, MainShell):
+            return
+        if self.search_modal is not None and self.search_modal.is_open:
+            return
+        self.search_modal = SearchModal(self, self.services, self.user.id)
+
+    def go_to(self, target: Target) -> None:
+        """Переходит к найденному: открывает нужный раздел, настройку или товар."""
+        if isinstance(self._screen, MainShell):
+            self._screen.go_to(target)
 
     def notify_options(self, user_id: int) -> NotifyOptions:
         """Общие настройки уведомлений пользователя (хранятся в предпочтениях)."""

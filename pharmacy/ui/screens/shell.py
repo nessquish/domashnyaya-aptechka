@@ -24,6 +24,7 @@ from pharmacy.services.container import Services
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import sections, theme
 from pharmacy.ui.preferences import MENU_ICONS
+from pharmacy.ui.search_index import PRODUCT, SECTION, SETTINGS, Target
 from pharmacy.ui.theme import CARD_SHADOW_PAD, palette
 
 if TYPE_CHECKING:
@@ -43,7 +44,11 @@ CONTENT_PADDING_X = theme.CONTENT_PADDING_X - CARD_SHADOW_PAD
 class _Rail(QFrame):
     """Узкая полоса с кнопкой «развернуть», которая остаётся от свёрнутой панели."""
 
-    def __init__(self, on_expand: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        on_expand: Callable[[], None],
+        on_search: Optional[Callable[[], None]] = None,
+    ) -> None:
         super().__init__()
         self.setFixedWidth(RAIL_WIDTH)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
@@ -53,6 +58,9 @@ class _Rail(QFrame):
         layout.addWidget(
             IconButton("panel-left", on_expand), 0, Qt.AlignmentFlag.AlignHCenter
         )
+        if on_search is not None:
+            self.search_button = IconButton("search", on_search)
+            layout.addWidget(self.search_button, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addStretch(1)
 
     def paintEvent(self, _event) -> None:
@@ -119,8 +127,11 @@ class MainShell(QWidget):
                 else None
             ),
             on_profile=self.open_profile,
+            on_search=self.app.open_search,
         )
-        self._rail = _Rail(lambda: self.set_sidebar_collapsed(False))
+        self._rail = _Rail(
+            lambda: self.set_sidebar_collapsed(False), self.app.open_search
+        )
         self._scroll = ScrollArea(gutter=CONTENT_PADDING_X)
         self._collapsed = bool(
             self.app.preferences.get(self.user.id, SIDEBAR_COLLAPSED, False)
@@ -168,6 +179,19 @@ class MainShell(QWidget):
         self.app.preferences.set(self.user.id, SIDEBAR_COLLAPSED, collapsed)
         self._sidebar.setVisible(not collapsed)
         self._rail.setVisible(collapsed)
+
+    def go_to(self, target: Target) -> None:
+        """Переходит к результату поиска: раздел, настройка или товар."""
+        if target.kind == SECTION:
+            self.navigate(str(target.value))
+        elif target.kind == SETTINGS:
+            self.navigate(sections.SETTINGS)
+            if isinstance(self._current, SettingsScreen):
+                self._current.open_section(str(target.value))
+        elif target.kind == PRODUCT:
+            self.navigate(sections.MY_KIT)
+            if isinstance(self._current, MyKitScreen):
+                self._current.reveal(int(target.value))
 
     def open_profile(self) -> None:
         """Открывает профиль пользователя: настройки, раздел «Аккаунт»."""
