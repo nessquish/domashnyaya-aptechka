@@ -1,7 +1,7 @@
 """Экран «Список покупок» (макет Figma, экраны 09 и 10)."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Set
+from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
@@ -16,6 +16,7 @@ from pharmacy.ui.widgets.controls import Checkbox, Segmented
 from pharmacy.ui.widgets.dialog import Modal
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.page import PageHeader
+from pharmacy.ui.widgets.popup import PopupList
 from pharmacy.ui.widgets.select import Select
 from pharmacy.ui.widgets.table import Column, DataTable, TextCell
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
@@ -46,6 +47,11 @@ DIALOG_WIDTH = 440
 def _created(item: ShoppingItem) -> str:
     """Дата добавления позиции в формате ДД.ММ.ГГГГ."""
     return format_user_date(datetime.strptime(item.created_at[:10], "%Y-%m-%d").date())
+
+
+def _caption(product) -> str:
+    """Строка подсказки: название и сколько этого товара сейчас в аптечке."""
+    return f"{product.name} · {format_quantity(product.quantity)} {product.unit}"
 
 
 class ShoppingScreen(QWidget):
@@ -245,6 +251,91 @@ class ShoppingScreen(QWidget):
         AddItemDialog(self._shell.app, self._services, self._user.id, self._reload)
 
 
+class ProductSearchField(ComboField):
+    """Поле названия с подсказками: при вводе показывает подходящие товары аптечки.
+
+    Список обновляется с каждой буквой. Выбранный товар запоминается, и позиция
+    списка покупок получает ссылку на его карточку.
+    """
+
+    def __init__(self, products: List[Tuple[int, str, str]], *args, **kwargs) -> None:
+        """Создаёт поле.
+
+        Args:
+            products: Товары аптечки: (номер, название, подпись в списке).
+        """
+        super().__init__([name for _, name, _ in products], *args, **kwargs)
+        self._products = products
+        self._picked: Optional[Tuple[int, str]] = None
+
+    @property
+    def product_id(self) -> Optional[int]:
+        """Выбранный товар, если название не меняли после выбора."""
+        if self._picked is not None and self._picked[1] == self.get().strip():
+            return self._picked[0]
+        return None
+
+    def _matches(self, text: str) -> List[Tuple[object, str]]:
+        needle = text.strip().casefold()
+        return [
+            (number, caption)
+            for number, name, caption in self._products
+            if needle and needle in name.casefold()
+        ]
+
+    def toggle_list(self) -> None:
+        """Стрелка открывает все товары аптечки."""
+        if self._popup is not None:
+            self._popup.close_list()
+            return
+        if not self._products:
+            return
+        options = [(number, caption) for number, _, caption in self._products]
+        self._popup = PopupList(
+            self.frame,
+            options,
+            self.product_id,
+            self._pick,
+            self._closed,
+            self.frame.box_rect(),
+        )
+
+    def _pick(self, value: object) -> None:
+        if isinstance(value, int):
+            name = next((n for number, n, _ in self._products if number == value), "")
+            self._picked = (value, name)
+            self.set(name)
+            self.clear_error()
+            if self._on_change is not None:
+                self._on_change()
+            return
+        super()._pick(value)
+
+    def _on_edited(self, text: str) -> None:
+        super()._on_edited(text)
+        self._refresh_suggestions()
+
+    def _refresh_suggestions(self) -> None:
+        """Обновляет список подсказок под введённым текстом."""
+        options = self._matches(self.get())
+        if not options or self.product_id is not None:
+            if self._popup is not None:
+                self._popup.close_list()
+            return
+        if self._popup is None:
+            self._popup = PopupList(
+                self.frame,
+                options,
+                None,
+                self._pick,
+                self._closed,
+                self.frame.box_rect(),
+                take_focus=False,
+            )
+        else:
+            self._popup.replace_options(options, None, self._pick)
+
+
 class AddItemDialog(Modal):
     """Окно «Добавить в список покупок»: название, количество и единица."""
 
@@ -262,10 +353,15 @@ class AddItemDialog(Modal):
         self._user_id = user_id
         self._on_added = on_added
         self.add_title("Добавить в список покупок")
-        self.add_text("Выберите товар из аптечки или введите новое название", bottom=16)
-        names = [v.product.name for v in services.products.list_products(user_id)]
-        self.name = ComboField(
-            names, "Название товара", "Введите название", required=True
+        self.add_text(
+            "Начните вводить название: ниже появятся товары из аптечки", bottom=16
+        )
+        products = [
+            (v.product.id, v.product.name, _caption(v.product))
+            for v in services.products.list_products(user_id)
+        ]
+        self.name = ProductSearchField(
+            products, "Название товара", "Введите название", required=True
         )
         self.body.addWidget(self.name)
         self.body.addSpacing(8)
@@ -294,6 +390,7 @@ class AddItemDialog(Modal):
                 self.name.get(),
                 self.quantity.get(),
                 self.unit.get() or DEFAULT_UNIT,
+                self.name.product_id,
             )
         except ValidationError as error:
             target = {"name": self.name, "quantity": self.quantity}.get(

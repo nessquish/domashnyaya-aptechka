@@ -42,6 +42,7 @@ class ShoppingService:
         name: str,
         quantity: str = "1",
         unit: str = DEFAULT_UNIT,
+        product_id: Optional[int] = None,
     ) -> ShoppingItem:
         """Добавляет в список покупок позицию, введённую вручную.
 
@@ -50,11 +51,14 @@ class ShoppingService:
             name: Название (обязательно).
             quantity: Количество текстом, больше нуля (по умолчанию 1).
             unit: Единица измерения (по умолчанию «шт.»).
+            product_id: Товар аптечки, выбранный в подсказках при вводе названия:
+                по нему у позиции появляется ссылка на карточку.
 
         Returns:
             Добавленная позиция.
 
         Raises:
+            NotFoundError: Если выбранного товара нет или он чужой.
             ValidationError: Если название пустое или количество неверно.
         """
         name = _check_length(name, MAX_NAME_LENGTH, "Название", "name")
@@ -64,7 +68,9 @@ class ShoppingService:
         if amount <= 0:
             raise ValidationError("Количество должно быть больше нуля", "quantity")
         unit = normalize_unit(unit)
-        return self._add(user_id, name, amount, unit, ShoppingSource.MANUAL, None)
+        if product_id is not None and self._products.get(user_id, product_id) is None:
+            raise NotFoundError("Товар не найден")
+        return self._add(user_id, name, amount, unit, ShoppingSource.MANUAL, product_id)
 
     def add_from_product(
         self, user_id: int, product_id: int, quantity: Optional[str] = None

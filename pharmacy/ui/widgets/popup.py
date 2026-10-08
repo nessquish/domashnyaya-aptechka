@@ -48,6 +48,7 @@ class PopupList(QWidget):
         on_close: Optional[Callable[[], None]] = None,
         field_rect: Optional[QRectF] = None,
         on_stage: Optional[Callable[[object], Optional[Stage]]] = None,
+        take_focus: bool = True,
     ) -> None:
         """Открывает список под полем.
 
@@ -61,6 +62,8 @@ class PopupList(QWidget):
             on_stage: Для списка из двух ступеней (вид сортировки, затем подвид).
                 Вызывается с выбранным значением; если вернула следующую ступень,
                 список в том же окне меняется на неё и остаётся открытым.
+            take_focus: False для подсказок при вводе: фокус остаётся в поле,
+                и можно продолжать печатать.
         """
         self._window = anchor.window()
         super().__init__(self._window)
@@ -76,10 +79,13 @@ class PopupList(QWidget):
         self._box = field_rect or QRectF(anchor.rect())
         self._fit()
         self.setMouseTracking(True)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setFocusPolicy(
+            Qt.FocusPolicy.StrongFocus if take_focus else Qt.FocusPolicy.NoFocus
+        )
         self.show()
         self.raise_()
-        self.setFocus()
+        if take_focus:
+            self.setFocus()
         QApplication.instance().installEventFilter(self)
 
     def _fit(self) -> None:

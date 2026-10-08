@@ -212,3 +212,57 @@ class AddItemDialogTest(ShoppingTestCase):
         self.settle()
         field.popup._on_pick("Бинт")
         self.assertEqual(field.get(), "Бинт")
+
+
+class LiveSearchTest(ShoppingTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.dialog = AddItemDialog(
+            self.app, self.services, self.app.user.id, self.shopping._reload
+        )
+        self.settle()
+        self.field = self.dialog.name
+
+    def test_suggestions_follow_every_letter(self):
+        self.field.set("и")
+        self.field._refresh_suggestions()
+        wide = len(self.field.popup.options)
+        self.field.set("ибуп")
+        self.field._refresh_suggestions()
+        self.assertTrue(self.field.popup.isVisible())
+        self.assertTrue(0 < len(self.field.popup.options) <= wide)
+        self.assertTrue(
+            all("ибуп" in text.casefold() for _, text in self.field.popup.options)
+        )
+
+    def test_no_match_closes_the_list(self):
+        self.field.set("ибуп")
+        self.field._refresh_suggestions()
+        self.field.set("яяяя")
+        self.field._refresh_suggestions()
+        self.assertIsNone(self.field.popup)
+
+    def test_chosen_product_gives_a_card_link(self):
+        self.field.set("ибуп")
+        self.field._refresh_suggestions()
+        number = self.field.popup.options[0][0]
+        self.field.popup._on_pick(number)
+        self.assertEqual(self.field.product_id, number)
+        self.dialog._submit()
+        item = next(i for i in self.items() if i.product_id == number)
+        self.assertEqual(item.name, self.field.get())
+
+    def test_editing_the_name_drops_the_link(self):
+        self.field.set("ибуп")
+        self.field._refresh_suggestions()
+        self.field.popup._on_pick(self.field.popup.options[0][0])
+        self.field.set(self.field.get() + " детский")
+        self.assertIsNone(self.field.product_id)
+
+    def test_typing_opens_suggestions_without_losing_focus(self):
+        from tests.qt_helpers import type_text
+
+        type_text(self.field.entry, "ибуп")
+        self.settle()
+        self.assertIsNotNone(self.field.popup)
+        self.assertTrue(self.field.popup.isVisible())
