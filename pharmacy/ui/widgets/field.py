@@ -232,7 +232,7 @@ class _IconSlot(QWidget):
         painter.drawPixmap(0, 0, icon_pixmap(self._name, ICON_SIZE, palette().ink_3))
 
 
-MENU_RADIUS = 8
+MENU_RADIUS = 12
 
 
 def menu_style() -> str:
@@ -240,9 +240,9 @@ def menu_style() -> str:
     pal = palette()
     return (
         f"QMenu {{ background: {pal.card}; border: 1px solid {pal.line};"
-        f" border-radius: {MENU_RADIUS}px; padding: 4px; }}"
-        f"QMenu::item {{ color: {pal.ink}; padding: 6px 22px 6px 12px;"
-        " border-radius: 6px; }"
+        f" border-radius: {MENU_RADIUS}px; padding: 6px; }}"
+        f"QMenu::item {{ color: {pal.ink}; padding: 8px 28px 8px 14px;"
+        " border-radius: 8px; margin: 1px 0; }"
         f"QMenu::item:selected {{ background: {pal.primary_soft};"
         f" color: {pal.primary_ink}; }}"
         f"QMenu::item:disabled {{ color: {pal.ink_3}; }}"
