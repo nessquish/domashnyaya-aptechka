@@ -7,7 +7,11 @@ from pharmacy.errors import NotFoundError, ValidationError
 from pharmacy.models import User
 from pharmacy.repositories.user_repository import UserRepository
 from pharmacy.services.notification_service import NotificationService
-from pharmacy.utils.validation import validate_email, validate_username
+from pharmacy.utils.validation import (
+    validate_email,
+    validate_login,
+    validate_username,
+)
 
 THEMES = ("light", "dark")
 MIN_WARNING_DAYS = 1
@@ -41,19 +45,30 @@ class SettingsService:
             raise NotFoundError("Пользователь не найден")
         return user
 
-    def update_profile(self, user_id: int, username: str, email: str) -> User:
-        """Меняет имя и почту.
+    def update_profile(
+        self,
+        user_id: int,
+        username: str,
+        email: str,
+        login: Optional[str] = None,
+    ) -> User:
+        """Меняет имя, почту и (если указан) логин.
 
         Raises:
             NotFoundError: Если пользователя нет.
-            ValidationError: Если имя или почта неверны либо почта занята.
+            ValidationError: Если данные неверны либо почта или логин заняты.
         """
         self.get_user(user_id)
         username = validate_username(username)
         email = validate_email(email)
         if self._users.email_used_by_other(email, user_id):
             raise ValidationError("Эта почта уже зарегистрирована", "email")
-        self._users.update_profile(user_id, username, email)
+        if login is not None:
+            login = validate_login(login)
+            owner = self._users.get_by_login(login)
+            if owner is not None and owner.id != user_id:
+                raise ValidationError("Этот логин уже занят", "login")
+        self._users.update_profile(user_id, username, email, login)
         return self.get_user(user_id)
 
     def update_settings(

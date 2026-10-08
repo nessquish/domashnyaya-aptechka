@@ -414,3 +414,43 @@ class ScaleRestartTest(SettingsTestCase):
         page._on_scale_mode(0)
         self.settle()
         self.assertTrue(self.buttons("Перезапустить"))
+
+
+class EditLoginTest(SettingsTestCase):
+    def test_every_account_field_can_be_edited(self):
+        page = self.section(ACCOUNT)
+        for button in (
+            page.edit_name_button,
+            page.edit_login_button,
+            page.edit_email_button,
+        ):
+            button.invoke()
+            self.settle()
+            self.assertTrue(page.profile_modal.is_open)
+            page.profile_modal.close_modal()
+            self.settle()
+
+    def test_login_can_be_changed(self):
+        page = self.section(ACCOUNT)
+        page.edit_login_button.invoke()
+        self.settle()
+        modal = page.profile_modal
+        modal.fields["login"].set("new_login")
+        modal._submit()
+        self.settle()
+        self.assertEqual(self.user().login, "new_login")
+        self.services.auth.login("new_login", PASSWORD)
+
+    def test_taken_or_bad_login_is_marked(self):
+        self.services.auth.register(
+            "taken", "Занят", "t@mail.ru", "password1", "password1"
+        )
+        page = self.section(ACCOUNT)
+        page.edit_login_button.invoke()
+        self.settle()
+        modal = page.profile_modal
+        for bad in ("taken", "ab"):
+            modal.fields["login"].set(bad)
+            modal._submit()
+            self.assertTrue(modal.is_open, bad)
+            self.assertIsNotNone(modal.fields["login"].error, bad)

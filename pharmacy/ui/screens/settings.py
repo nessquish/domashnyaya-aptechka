@@ -624,15 +624,22 @@ class SettingsScreen(QWidget):
 
     def _build_account(self) -> None:
         user = self._user
-        row, _ = self._row("Имя пользователя", first=True)
-        row.addWidget(label(user.username, "body", "ink_2"))
-        row, _ = self._row("Логин")
-        row.addWidget(label(user.login, "body", "ink_2"))
-        row, _ = self._row("Электронная почта")
-        row.addWidget(label(user.email, "body", "ink_2"))
-        row.addSpacing(12)
-        self.edit_email_button = Button("Изменить", self._edit_profile, size="sm")
-        row.addWidget(self.edit_email_button)
+        buttons = {}
+        for key, title, value, first in (
+            ("username", "Имя пользователя", user.username, True),
+            ("login", "Логин", user.login, False),
+            ("email", "Электронная почта", user.email, False),
+        ):
+            row, _ = self._row(title, first=first)
+            row.addWidget(label(value, "body", "ink_2"))
+            row.addSpacing(12)
+            buttons[key] = Button(
+                "Изменить", lambda k=key: self._edit_profile(k), size="sm"
+            )
+            row.addWidget(buttons[key])
+        self.edit_name_button = buttons["username"]
+        self.edit_login_button = buttons["login"]
+        self.edit_email_button = buttons["email"]
         row, _ = self._row("Пароль", "Не менее 8 символов")
         self.password_button = Button("Сменить пароль", self._edit_password, size="sm")
         row.addWidget(self.password_button)
@@ -645,8 +652,10 @@ class SettingsScreen(QWidget):
         )
         row.addWidget(self.delete_button)
 
-    def _edit_profile(self) -> None:
-        self.profile_modal = ProfileModal(self._app, self._services, self._user, self)
+    def _edit_profile(self, focus: str = "username") -> None:
+        self.profile_modal = ProfileModal(
+            self._app, self._services, self._user, self, focus
+        )
 
     def _edit_password(self) -> None:
         self.password_modal = PasswordModal(self._app, self._services, self._user, self)
@@ -786,20 +795,28 @@ class _FormModal(Modal):
 
 
 class ProfileModal(_FormModal):
-    """Изменение имени и электронной почты."""
+    """Изменение имени, логина и электронной почты."""
 
-    def __init__(self, app, services, user, screen: SettingsScreen) -> None:
+    def __init__(
+        self, app, services, user, screen: SettingsScreen, focus: str = "username"
+    ) -> None:
         super().__init__(
             app,
             "Изменить данные",
-            [("username", "Имя пользователя", False), ("email", "Эл. почта", False)],
+            [
+                ("username", "Имя пользователя", False),
+                ("login", "Логин", False),
+                ("email", "Эл. почта", False),
+            ],
             "Сохранить",
         )
         self._services = services
         self._user = user
         self._screen = screen
         self.fields["username"].set(user.username)
+        self.fields["login"].set(user.login)
         self.fields["email"].set(user.email)
+        self.fields.get(focus, self.fields["username"]).focus_field()
 
     def _submit(self) -> None:
         try:
@@ -807,6 +824,7 @@ class ProfileModal(_FormModal):
                 self._user.id,
                 self.fields["username"].get(),
                 self.fields["email"].get(),
+                self.fields["login"].get(),
             )
         except ValidationError as error:
             self._show_error(error)

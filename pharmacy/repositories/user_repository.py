@@ -106,13 +106,22 @@ class UserRepository(BaseRepository):
         )
         return row is not None
 
-    def update_profile(self, user_id: int, username: str, email: str) -> None:
-        """Меняет имя и почту пользователя."""
+    def update_profile(
+        self, user_id: int, username: str, email: str, login: Optional[str] = None
+    ) -> None:
+        """Меняет имя, почту и (если указан) логин пользователя."""
         with self._connection() as c:
-            c.execute(
-                "UPDATE users SET username = ?, email = ? WHERE id = ?",
-                (username, email, user_id),
-            )
+            if login is None:
+                c.execute(
+                    "UPDATE users SET username = ?, email = ? WHERE id = ?",
+                    (username, email, user_id),
+                )
+            else:
+                c.execute(
+                    "UPDATE users SET username = ?, email = ?, login = ?"
+                    " WHERE id = ?",
+                    (username, email, login, user_id),
+                )
 
     def update_settings(
         self,

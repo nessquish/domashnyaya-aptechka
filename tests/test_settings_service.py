@@ -110,3 +110,23 @@ class SettingsTest(SettingsTestCase):
         self.save(warning_days="5", theme="dark")
         other = self.service.get_user(other_id)
         self.assertEqual((other.warning_days, other.theme), (30, "light"))
+
+
+class LoginChangeTest(SettingsTestCase):
+    def test_login_is_changed(self):
+        user = self.service.update_profile(self.user_id, "Анна", "a@b.ru", "anna_new")
+        self.assertEqual(user.login, "anna_new")
+
+    def test_own_login_in_other_case_is_allowed(self):
+        user = self.service.update_profile(self.user_id, "Анна", "a@b.ru", "ANNA")
+        self.assertEqual(user.login.lower(), "anna")
+
+    def test_taken_login_is_rejected(self):
+        self.add_user("boris")
+        with self.assertRaises(ValidationError) as ctx:
+            self.service.update_profile(self.user_id, "Анна", "a@b.ru", "Boris")
+        self.assertEqual(ctx.exception.field, "login")
+
+    def test_bad_login_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            self.service.update_profile(self.user_id, "Анна", "a@b.ru", "я")
