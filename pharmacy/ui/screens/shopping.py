@@ -1,8 +1,10 @@
 """Экран «Список покупок» (макет Figma, экраны 09 и 10)."""
 
+import math
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from pharmacy.errors import ValidationError
@@ -12,13 +14,15 @@ from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
 from pharmacy.ui.widgets.combo import ComboField
-from pharmacy.ui.widgets.controls import Checkbox, Segmented
+from pharmacy.ui.widgets.common import Line, clear_layout, label
+from pharmacy.ui.widgets.controls import Checkbox, Pagination, Segmented
 from pharmacy.ui.widgets.dialog import Modal
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.page import PageHeader
 from pharmacy.ui.widgets.popup import PopupList
 from pharmacy.ui.widgets.select import Select
 from pharmacy.ui.widgets.table import Column, DataTable, TextCell
+from pharmacy.ui.paging import fitted_rows, remembered_rows
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
 from pharmacy.utils.dates import format_user_date
 from pharmacy.utils.formatting import format_quantity
@@ -42,6 +46,7 @@ COLUMNS = (
 )
 EMPTY_TEXT = "Список покупок пуст. Добавьте товар вручную или из уведомления."
 DIALOG_WIDTH = 440
+PAGING_KEY = "shopping"
 
 
 def _created(item: ShoppingItem) -> str:
@@ -70,7 +75,9 @@ class ShoppingScreen(QWidget):
         self._user = shell.user
         self._filter = tab
         self._selected: Set[int] = set()
-        self._visible: List[ShoppingItem] = []
+        self._visible: List[ShoppingItem] = []  # позиции текущей страницы
+        self._page = 1
+        self._page_size = remembered_rows(PAGING_KEY)
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(0)
@@ -95,6 +102,7 @@ class ShoppingScreen(QWidget):
 
     def _build_table(self) -> None:
         card = Card(flush=True)
+        self._card = card
         self._bar = ActionBar(card)
         self.bought_button = Button(
             "Отметить как купленные",
@@ -117,6 +125,10 @@ class ShoppingScreen(QWidget):
         self._select_all = self._table.set_header_widget(
             0, lambda: Checkbox(False, self._toggle_all)
         )
+        self._footer = QVBoxLayout()
+        self._footer.setContentsMargins(0, 0, 0, 0)
+        self._footer.setSpacing(0)
+        card.body.addLayout(self._footer)
         self._layout.addWidget(card)
 
     def _tab_labels(self) -> List[str]:
@@ -157,11 +169,13 @@ class ShoppingScreen(QWidget):
 
     def _reload(self) -> None:
         """Заново читает список и перерисовывает вкладки, панель и таблицу."""
-        self._visible = self._services.shopping.list_items(
-            self._user.id, FILTERS[self._filter]
-        )
-        known = {item.id for item in self._visible}
-        self._selected &= known
+        found = self._services.shopping.list_items(self._user.id, FILTERS[self._filter])
+        self._selected &= {item.id for item in found}
+        size = self._page_size
+        pages = max(math.ceil(len(found) / size), 1)
+        self._page = min(self._page, pages)
+        start = (self._page - 1) * size
+        self._visible = found[start : start + size]
         self.setUpdatesEnabled(False)
         try:
             self._tabs.set_items(self._tab_labels())
@@ -170,6 +184,7 @@ class ShoppingScreen(QWidget):
                 self._table.add_message(EMPTY_TEXT)
             for item in self._visible:
                 self._table.add_row(self._cells(item), item.id in self._selected)
+            self._build_footer(len(found), start, pages)
             self._update_bar()
         finally:
             self.setUpdatesEnabled(True)
@@ -204,6 +219,53 @@ class ShoppingScreen(QWidget):
             TextCell(_created(item), muted),
         ]
 
+    def _build_footer(self, total: int, start: int, pages: int) -> None:
+        """Строка «Показано …» и переключатель страниц."""
+        clear_layout(self._footer)
+        if pages <= 1:
+            return
+        self._footer.addWidget(Line("line"))
+        row = QHBoxLayout()
+        row.setContentsMargins(14, 10, 14, 10)
+        shown = len(self._visible)
+        self.summary = label(
+            f"Показано {start + 1}–{start + shown} из {total}", "small", "ink_2"
+        )
+        row.addWidget(self.summary)
+        row.addStretch(1)
+        self.pagination = Pagination(self._page, pages, self._on_page)
+        row.addWidget(self.pagination)
+        self._footer.addLayout(row)
+
+    def _on_page(self, page: int) -> None:
+        self._page = page
+        self._reload()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self.fit_rows)
+
+    def fit_rows(self) -> None:
+        """Подгоняет число строк на странице под высоту окна."""
+        if not hasattr(self, "_footer"):
+            return
+        size = fitted_rows(
+            PAGING_KEY,
+            self,
+            self._card,
+            self._table,
+            self._table.header_height,
+            self._table.row_count,
+            self._page_size,
+            self._shell.viewport_height(),
+        )
+        if size != self._page_size:
+            first = (self._page - 1) * self._page_size
+            self._page_size = size
+            self._page = first // size + 1
+            self._reload()
+            QTimer.singleShot(0, self.fit_rows)
+
     def _update_bar(self) -> None:
         """Показывает панель действий, пока выбрана хотя бы одна строка."""
         count = len(self._selected)
@@ -221,6 +283,7 @@ class ShoppingScreen(QWidget):
 
     def _on_tab(self, index: int) -> None:
         self._filter = index
+        self._page = 1
         self._selected.clear()
         self._reload()
 

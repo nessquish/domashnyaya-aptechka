@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 
 from pharmacy.db.seed import seed_demo  # noqa: E402
 from pharmacy.services.container import build_services  # noqa: E402
-from pharmacy.ui import runtime, theme  # noqa: E402
+from pharmacy.ui import paging, runtime, theme  # noqa: E402
 from pharmacy.ui.app import App  # noqa: E402
 from pharmacy.ui.screens.shell import MainShell  # noqa: E402
 from pharmacy.ui.widgets.button import Button  # noqa: E402
@@ -68,6 +68,8 @@ class AppTestCase(DatabaseTestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        paging.AUTO_FIT = False  # страницы по 8 строк, окно теста не меряем
+        self.addCleanup(setattr, paging, "AUTO_FIT", True)
         self.services = build_services(self.db)
         self.services.auth.register(
             "anna", "Анна", "anna@mail.ru", "password1", "password1"

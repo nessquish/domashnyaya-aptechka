@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Callable, Dict, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget
 from PySide6.QtGui import QColor, QPainter
 
@@ -126,6 +126,16 @@ class MainShell(QWidget):
         content.addWidget(self._scroll)
         row.addLayout(content, 1)
         self.navigate(start)
+
+    def viewport_height(self) -> int:
+        """Высота видимой области раздела."""
+        return self._scroll.viewport().height()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        fit = getattr(self._current, "fit_rows", None)
+        if fit is not None:
+            QTimer.singleShot(0, fit)
 
     @property
     def current(self) -> Optional[QWidget]:

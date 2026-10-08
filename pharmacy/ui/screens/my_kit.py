@@ -20,6 +20,7 @@ from pharmacy.ui.widgets.table import Column, DataTable, TextCell
 from pharmacy.services.product_service import ProductView
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import labels, sorting
+from pharmacy.ui.paging import DEFAULT_ROWS, fitted_rows, remembered_rows
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
 from pharmacy.utils.dates import format_user_date
 from pharmacy.utils.formatting import format_quantity
@@ -27,7 +28,8 @@ from pharmacy.utils.formatting import format_quantity
 if TYPE_CHECKING:
     from pharmacy.ui.screens.shell import MainShell
 
-PAGE_SIZE = 8
+PAGE_SIZE = DEFAULT_ROWS  # строк на странице, пока окно не измерено
+PAGING_KEY = "my_kit"
 SEARCH_DELAY_MS = 250
 SORT_PREFERENCE = "kit_sort"  # выбранная сортировка запоминается для пользователя
 COLUMNS = (
@@ -69,6 +71,7 @@ class MyKitScreen(QWidget):
         # Сортировка не выбрана или запомнено что-то неизвестное: по состоянию.
         self._sort = saved if sorting.is_sort(saved) else sorting.DEFAULT_SORT
         self._page = 1
+        self._page_size = remembered_rows(PAGING_KEY)
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(SEARCH_DELAY_MS)
@@ -204,12 +207,37 @@ class MyKitScreen(QWidget):
             )
         return views
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self.fit_rows)
+
+    def fit_rows(self) -> None:
+        """Подгоняет число строк на странице под высоту окна."""
+        if not hasattr(self, "_card"):
+            return
+        size = fitted_rows(
+            PAGING_KEY,
+            self,
+            self._card,
+            self._table,
+            self._table.header_height,
+            self._table.row_count,
+            self._page_size,
+            self._shell.viewport_height(),
+        )
+        if size != self._page_size:
+            first = (self._page - 1) * self._page_size
+            self._page_size = size
+            self._page = first // size + 1
+            self._reload()
+            QTimer.singleShot(0, self.fit_rows)
+
     def reveal(self, product_id: int) -> None:
         """Переходит на страницу таблицы, где стоит товар (после добавления)."""
         views = self._load()
         for index, view in enumerate(views):
             if view.product.id == product_id:
-                self._page = index // PAGE_SIZE + 1
+                self._page = index // self._page_size + 1
                 self._reload()
                 return
 
@@ -217,6 +245,7 @@ class MyKitScreen(QWidget):
 
     def _build_table(self) -> None:
         card = Card(flush=True)
+        self._card = card
         self._table = DataTable(COLUMNS, card)
         for kind in sorting.SORT_KINDS:
             if kind.column is not None:
@@ -233,10 +262,11 @@ class MyKitScreen(QWidget):
     def _reload(self) -> None:
         """Заново читает товары по текущим условиям и перерисовывает таблицу."""
         views = self._load()
-        pages = max(math.ceil(len(views) / PAGE_SIZE), 1)
+        size = self._page_size
+        pages = max(math.ceil(len(views) / size), 1)
         self._page = min(self._page, pages)
-        start = (self._page - 1) * PAGE_SIZE
-        shown = views[start : start + PAGE_SIZE]
+        start = (self._page - 1) * size
+        shown = views[start : start + size]
         self.setUpdatesEnabled(False)
         try:
             self._show_sort()

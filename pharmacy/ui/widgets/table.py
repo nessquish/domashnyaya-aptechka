@@ -288,6 +288,11 @@ class DataTable(QWidget):
         self._next_row += 1
 
     @property
+    def header_height(self) -> int:
+        """Высота шапки таблицы."""
+        return self._header_height
+
+    @property
     def row_count(self) -> int:
         """Сколько строк с данными в таблице (без сообщений)."""
         return self._data_rows
