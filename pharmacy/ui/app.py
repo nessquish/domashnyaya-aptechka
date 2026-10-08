@@ -12,6 +12,7 @@ from pharmacy.ui.screens.auth import LoginScreen, RegisterScreen
 from pharmacy.ui.screens.shell import TEXT_SIZE, MainShell
 from pharmacy.services.container import Services, build_services
 from pharmacy.ui import sections, theme
+from pharmacy.ui.scaling import apply_scale_factor
 from pharmacy.ui.preferences import Preferences
 
 WINDOW_TITLE = "Моя аптечка"
@@ -173,6 +174,7 @@ def run(db: Optional[Database] = None) -> None:
     Args:
         db: База данных. Если не задана, используется файл из настроек.
     """
+    apply_scale_factor()
     application = runtime.application()
     db = db or Database()
     db.init_schema()
