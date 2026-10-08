@@ -176,6 +176,12 @@ def window_width() -> int:
     return round(WINDOW_MIN_WIDTH * text_scale() / normal)
 
 
+def narrow_width() -> int:
+    """Ширина окна, при которой боковая панель сама прячется (растёт с текстом)."""
+    normal = TEXT_SIZES[DEFAULT_TEXT_SIZE][1]
+    return round(NARROW_WIDTH * text_scale() / normal)
+
+
 def sidebar_width() -> int:
     """Ширина боковой панели растёт вместе с текстом, чтобы пункты не были тесными."""
     return round(SIDEBAR_WIDTH * text_scale())
@@ -231,7 +237,8 @@ def hex_to_rgb(color: str) -> Tuple[int, int, int]:
 # Размеры из макета (в пикселях).
 WINDOW_WIDTH = 1160
 WINDOW_HEIGHT = 660
-WINDOW_MIN_WIDTH = 960  # окно можно сузить до половины экрана 1920×1080
+WINDOW_MIN_WIDTH = 800  # окно можно сузить до половины экрана и уже
+NARROW_WIDTH = 1100  # уже этого боковая панель сама прячется
 WINDOW_MIN_HEIGHT = 520
 SIDEBAR_WIDTH = 190
 CONTENT_PADDING_X = 28
