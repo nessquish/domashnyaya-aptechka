@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pharmacy.db.connection import Database
 from pharmacy.services.auth_service import AuthService
 from pharmacy.services.dashboard_service import DashboardService
+from pharmacy.services.data_service import DataService
 from pharmacy.services.history_service import HistoryService
 from pharmacy.services.notification_service import NotificationService
 from pharmacy.services.product_service import ProductService
@@ -27,6 +28,7 @@ class Services:
     history: HistoryService
     settings: SettingsService
     dashboard: DashboardService
+    data: DataService
 
 
 def build_services(db: Database) -> Services:
@@ -39,12 +41,14 @@ def build_services(db: Database) -> Services:
         db: Менеджер базы данных.
     """
     notifications = NotificationService(db)
+    products = ProductService(db, notifications)
     return Services(
         auth=AuthService(db),
-        products=ProductService(db, notifications),
+        products=products,
         notifications=notifications,
         shopping=ShoppingService(db),
         history=HistoryService(db),
         settings=SettingsService(db, notifications),
         dashboard=DashboardService(db),
+        data=DataService(db, products),
     )

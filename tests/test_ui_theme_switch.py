@@ -65,6 +65,7 @@ class ThemeSwitchTest(ShellTestCase):
 
     def test_settings_switch_applies_the_theme_at_once(self):
         self.open(sections.SETTINGS)
+        self.page.open_section("appearance")
         switch = self.page.theme_switch
         left, right = switch.spans[1]
         click(switch, (left + right) // 2, 10)

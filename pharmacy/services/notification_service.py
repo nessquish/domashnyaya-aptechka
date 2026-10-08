@@ -6,8 +6,9 @@
 Когда причина исчезает, уведомление удаляется само.
 """
 
+from dataclasses import dataclass
 from datetime import date
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from pharmacy.db.connection import Database
 from pharmacy.errors import NotFoundError
@@ -56,6 +57,22 @@ def _low_stock_message(product: Product) -> str:
     )
 
 
+@dataclass(frozen=True)
+class NotifyOptions:
+    """Общие настройки уведомлений поверх настроек пользователя в базе.
+
+    Attributes:
+        enabled: Уведомления включены вообще.
+        expiring: Предупреждать о скором окончании срока.
+        low_threshold: Считать остаток низким, если он меньше этого числа
+            (0 означает «только по минимальному остатку самого товара»).
+    """
+
+    enabled: bool = True
+    expiring: bool = True
+    low_threshold: float = 0.0
+
+
 class NotificationService:
     """Правила создания и чтения уведомлений."""
 
@@ -69,6 +86,8 @@ class NotificationService:
         self._notifications = NotificationRepository(db)
         self._products = ProductRepository(db)
         self._users = UserRepository(db)
+        # Интерфейс подставляет сюда настройки пользователя из его предпочтений.
+        self.options_for: Callable[[int], NotifyOptions] = lambda _id: NotifyOptions()
 
     def refresh(
         self,
@@ -107,18 +126,22 @@ class NotificationService:
             single = self._products.get(user_id, product_id)
             products = [single] if single else []
 
+        options = self.options_for(user_id)
         desired: Dict[_Key, str] = {}
-        for product in products:
+        for product in products if options.enabled else []:
             statuses = product_statuses(product, user.warning_days, today)
             if ProductStatus.EXPIRED in statuses and user.notify_expired:
                 desired[(product.id, NotificationKind.EXPIRED)] = _expired_message(
                     product
                 )
-            if ProductStatus.EXPIRING in statuses:
+            if ProductStatus.EXPIRING in statuses and options.expiring:
                 desired[(product.id, NotificationKind.EXPIRING)] = _expiring_message(
                     product, today
                 )
-            if ProductStatus.LOW_STOCK in statuses and user.notify_low_stock:
+            low = ProductStatus.LOW_STOCK in statuses or (
+                options.low_threshold > 0 and product.quantity < options.low_threshold
+            )
+            if low and user.notify_low_stock:
                 desired[(product.id, NotificationKind.LOW_STOCK)] = _low_stock_message(
                     product
                 )

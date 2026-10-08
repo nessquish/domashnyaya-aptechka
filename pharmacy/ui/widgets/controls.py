@@ -229,6 +229,100 @@ class Checkbox(_Switch):
             fill_rounded(painter, box, 4, pal.input_bg, pal.checkbox_line, 2)
 
 
+class Slider(QWidget):
+    """Ползунок: значение от минимума до максимума, тянется мышью.
+
+    ``on_change`` вызывается при каждом движении, ``on_done`` когда кнопку
+    мыши отпустили (удобно сохранять значение один раз).
+    """
+
+    WIDTH, HEIGHT = 220, 22
+    TRACK, KNOB = 4, 16
+
+    def __init__(
+        self,
+        minimum: int,
+        maximum: int,
+        value: int,
+        on_change: Optional[Callable[[int], None]] = None,
+        on_done: Optional[Callable[[int], None]] = None,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._min, self._max = minimum, maximum
+        self._value = max(minimum, min(value, maximum))
+        self._on_change = on_change
+        self._on_done = on_done
+        self.setFixedSize(self.WIDTH, self.HEIGHT)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    @property
+    def value(self) -> int:
+        """Текущее значение."""
+        return self._value
+
+    def set(self, value: int) -> None:
+        """Меняет значение без вызова обработчиков."""
+        self._value = max(self._min, min(value, self._max))
+        self.update()
+
+    def sizeHint(self) -> QSize:
+        return self.size()
+
+    def _from_x(self, x: float) -> int:
+        left, right = self.KNOB / 2, self.WIDTH - self.KNOB / 2
+        share = (min(max(x, left), right) - left) / (right - left)
+        return round(self._min + share * (self._max - self._min))
+
+    def _move(self, event) -> None:
+        value = self._from_x(event.position().x())
+        if value != self._value:
+            self._value = value
+            self.update()
+            if self._on_change is not None:
+                self._on_change(value)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._move(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            self._move(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._on_done:
+            self._on_done(self._value)
+
+    def keyPressEvent(self, event) -> None:
+        step = {Qt.Key.Key_Left: -1, Qt.Key.Key_Right: 1}.get(event.key())
+        if step is None:
+            super().keyPressEvent(event)
+            return
+        self.set(self._value + step)
+        if self._on_change is not None:
+            self._on_change(self._value)
+        if self._on_done is not None:
+            self._on_done(self._value)
+
+    def paintEvent(self, _event) -> None:
+        pal = palette()
+        painter = QPainter(self)
+        begin(painter)
+        half = self.KNOB / 2
+        middle = self.HEIGHT / 2
+        share = (self._value - self._min) / max(self._max - self._min, 1)
+        x = half + share * (self.WIDTH - self.KNOB)
+        track = QRectF(
+            half, middle - self.TRACK / 2, self.WIDTH - self.KNOB, self.TRACK
+        )
+        fill_rounded(painter, track, self.TRACK / 2, pal.checkbox_line)
+        done = QRectF(half, track.top(), x - half, self.TRACK)
+        fill_rounded(painter, done, self.TRACK / 2, pal.primary)
+        knob = QRectF(x - half, middle - half, self.KNOB, self.KNOB)
+        fill_rounded(painter, knob, half, "#FFFFFF", pal.primary, 2)
+
+
 class Pagination(QWidget):
     """Кнопки страниц: стрелки и номера."""
 

@@ -9,6 +9,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+GLOBAL_USER = 0  # предпочтения, общие для всех пользователей (масштаб окна)
+SCALE_MODE = "scale_mode"  # auto или manual
+SCALE_PERCENT = "scale_percent"  # от 80 до 150
+MENU_ICONS = "menu_icons"  # показывать значки в боковом меню
+
 
 class Preferences:
     """Чтение и запись предпочтений пользователей.

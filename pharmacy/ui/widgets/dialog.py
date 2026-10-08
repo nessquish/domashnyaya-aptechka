@@ -166,6 +166,7 @@ class Dialog(Modal):
         cancel_text: str = "Отмена",
         warning: bool = False,
         width: int = 400,
+        info: bool = False,
     ) -> None:
         """Показывает окно.
 
@@ -179,6 +180,7 @@ class Dialog(Modal):
             cancel_text: Подпись кнопки отмены.
             warning: Показать красный значок восклицания над заголовком.
             width: Ширина окна.
+            info: Только сообщение: одна кнопка, без «Отмена».
         """
         super().__init__(host, width, on_enter=self._confirm)
         self._on_confirm = on_confirm
@@ -192,7 +194,8 @@ class Dialog(Modal):
         self.confirm_button = Button(
             confirm_text, self._confirm, variant=confirm_variant
         )
-        buttons.addWidget(self.cancel_button)
+        if not info:
+            buttons.addWidget(self.cancel_button)
         buttons.addWidget(self.confirm_button)
 
     def _confirm(self) -> None:

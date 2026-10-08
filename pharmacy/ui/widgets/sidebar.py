@@ -30,6 +30,8 @@ COUNTER_PADDING_X = 7
 COUNTER_PADDING_Y = 1
 AVATAR_SIZE = 26
 LINK_ICON = 14
+NAV_ICON = 16
+NAV_ICON_GAP = 10
 LINK_GAP = 8
 
 
@@ -41,9 +43,11 @@ class NavItem(QAbstractButton):
         text: str,
         command: Callable[[], None],
         parent: Optional[QWidget] = None,
+        icon: Optional[str] = None,
     ) -> None:
         super().__init__(parent)
         self.setText(text)
+        self._icon = icon
         self._active = False
         self._count = 0
         self._height = line_height("body") + 2 * NAV_PADDING_Y
@@ -90,10 +94,18 @@ class NavItem(QAbstractButton):
                 fill_rounded(
                     painter, body, NAV_RADIUS, mix(pal.side, pal.primary_soft, 0.5)
                 )
+        left = NAV_PAD + NAV_PADDING_X
+        if self._icon:
+            painter.drawPixmap(
+                round(left),
+                round(body.center().y() - NAV_ICON / 2),
+                icon_pixmap(self._icon, NAV_ICON, ink),
+            )
+            left += NAV_ICON + NAV_ICON_GAP
         painter.setFont(font(style))
         painter.setPen(qcolor(ink))
         painter.drawText(
-            QRectF(NAV_PAD + NAV_PADDING_X, body.top(), body.width(), body.height()),
+            QRectF(left, body.top(), body.width(), body.height()),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             self.text(),
         )
@@ -195,6 +207,7 @@ class Sidebar(QFrame):
         on_toggle_theme: Callable[[], None],
         on_collapse: Callable[[], None],
         parent: Optional[QWidget] = None,
+        icons: Optional[Dict[str, str]] = None,
     ) -> None:
         """Создаёт меню.
 
@@ -206,6 +219,7 @@ class Sidebar(QFrame):
             on_toggle_theme: Вызывается при нажатии на «Тёмная/Светлая тема».
             on_collapse: Вызывается при нажатии на кнопку сворачивания панели.
             parent: Родитель.
+            icons: Значки пунктов по названию раздела (None: без значков).
         """
         super().__init__(parent)
         pal = palette()
@@ -229,7 +243,11 @@ class Sidebar(QFrame):
 
         self._items: Dict[str, NavItem] = {}
         for name in sections:
-            item = NavItem(name, lambda value=name: on_select(value))
+            item = NavItem(
+                name,
+                lambda value=name: on_select(value),
+                icon=(icons or {}).get(name),
+            )
             outer.addWidget(item)
             self._items[name] = item
         outer.addStretch(1)

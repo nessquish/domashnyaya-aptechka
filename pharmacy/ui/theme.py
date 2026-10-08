@@ -132,9 +132,9 @@ _active_name = LIGHT_THEME
 
 # Размер текста: ключ -> (подпись, во сколько раз крупнее макета).
 TEXT_SIZES: Dict[str, Tuple[str, float]] = {
-    "normal": ("Обычный", 1.1),
+    "normal": ("Мелкий", 1.1),
     "medium": ("Средний", 1.25),
-    "large": ("Большой", 1.4),
+    "large": ("Крупный", 1.4),
 }
 DEFAULT_TEXT_SIZE = "normal"
 _text_size = DEFAULT_TEXT_SIZE

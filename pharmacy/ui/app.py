@@ -15,7 +15,13 @@ from pharmacy.ui.screens.shell import TEXT_SIZE, THEME_MODE, MainShell
 from pharmacy.services.container import Services, build_services
 from pharmacy.ui import sections, theme
 from pharmacy.ui.scaling import apply_scale_factor
-from pharmacy.ui.preferences import Preferences
+from pharmacy.services.notification_service import NotifyOptions
+from pharmacy.ui.preferences import (
+    GLOBAL_USER,
+    SCALE_MODE,
+    SCALE_PERCENT,
+    Preferences,
+)
 from pharmacy.ui.remember import REMEMBER_FILE, RememberedLogin
 
 WINDOW_TITLE = "Моя аптечка"
@@ -53,6 +59,8 @@ class App(QMainWindow):
         self.services = services
         self.preferences = preferences or Preferences()
         self.remembered = remembered or RememberedLogin()
+        self.reopen_settings: Optional[str] = None  # раздел настроек после пересборки
+        services.notifications.options_for = self.notify_options
         self.user: Optional[User] = None
         self.session_password = ""
         self._screen: Optional[QWidget] = None
@@ -172,6 +180,15 @@ class App(QMainWindow):
         )
         self._fit_window()
 
+    def notify_options(self, user_id: int) -> NotifyOptions:
+        """Общие настройки уведомлений пользователя (хранятся в предпочтениях)."""
+        prefs = self.preferences
+        return NotifyOptions(
+            enabled=bool(prefs.get(user_id, "notify_enabled", True)),
+            expiring=bool(prefs.get(user_id, "notify_expiring", True)),
+            low_threshold=float(prefs.get(user_id, "low_threshold", 0) or 0),
+        )
+
     def theme_mode(self, user: User) -> str:
         """Выбор темы пользователя: ``light``, ``dark`` или ``system``."""
         mode = self.preferences.get(user.id, THEME_MODE, user.theme)
@@ -242,17 +259,25 @@ class App(QMainWindow):
         )
 
 
+def manual_scale(preferences: Preferences) -> Optional[float]:
+    """Ручной масштаб из настроек (None, если выбран автоматический)."""
+    if preferences.get(GLOBAL_USER, SCALE_MODE, "auto") != "manual":
+        return None
+    percent = preferences.get(GLOBAL_USER, SCALE_PERCENT, 100)
+    return float(percent) / 100
+
+
 def run(db: Optional[Database] = None) -> None:
     """Запускает приложение.
 
     Args:
         db: База данных. Если не задана, используется файл из настроек.
     """
-    apply_scale_factor()
-    application = runtime.application()
     db = db or Database()
-    db.init_schema()
     preferences = Preferences(db.path.parent / PREFERENCES_FILE)
+    apply_scale_factor(manual_scale(preferences))
+    application = runtime.application()
+    db.init_schema()
     remembered = RememberedLogin(db.path.parent / REMEMBER_FILE)
     window = App(build_services(db), preferences, remembered)
     window.restore_session()

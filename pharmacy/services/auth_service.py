@@ -127,6 +127,15 @@ class AuthService:
         validate_password(new_password, new_password_repeat, field="new_password")
         self._users.update_password_hash(user_id, hash_password(new_password))
 
+    def delete_account(self, user_id: int) -> None:
+        """Удаляет аккаунт вместе со всеми данными пользователя.
+
+        Raises:
+            NotFoundError: Если пользователя нет.
+        """
+        self._require_user(user_id)
+        self._users.delete(user_id)
+
     def _require_user(self, user_id: int) -> User:
         """Возвращает пользователя или выбрасывает NotFoundError."""
         user = self._users.get_by_id(user_id)

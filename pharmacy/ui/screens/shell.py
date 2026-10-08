@@ -23,6 +23,7 @@ from pharmacy.ui.widgets.sidebar import Sidebar
 from pharmacy.services.container import Services
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import sections, theme
+from pharmacy.ui.preferences import MENU_ICONS
 from pharmacy.ui.theme import CARD_SHADOW_PAD, palette
 
 if TYPE_CHECKING:
@@ -112,6 +113,11 @@ class MainShell(QWidget):
             self.confirm_logout,
             self.toggle_theme,
             lambda: self.set_sidebar_collapsed(True),
+            icons=(
+                sections.ICONS
+                if self.app.preferences.get(self.user.id, MENU_ICONS, True)
+                else None
+            ),
         )
         self._rail = _Rail(lambda: self.set_sidebar_collapsed(False))
         self._scroll = ScrollArea(gutter=CONTENT_PADDING_X)

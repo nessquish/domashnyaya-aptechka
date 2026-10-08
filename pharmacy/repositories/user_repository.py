@@ -154,3 +154,8 @@ class UserRepository(BaseRepository):
                 "UPDATE users SET password_hash = ? WHERE id = ?",
                 (password_hash, user_id),
             )
+
+    def delete(self, user_id: int) -> None:
+        """Удаляет пользователя; товары, покупки и история удаляются каскадом."""
+        with self._connection(None) as conn:
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))

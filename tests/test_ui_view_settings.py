@@ -185,14 +185,13 @@ class TextSizeInAppTest(ShellTestCase):
 
     def open_settings(self):
         self.open(sections.SETTINGS)
+        self.page.open_section("appearance")
 
     def test_settings_offer_three_sizes(self):
         self.open_settings()
         page = self.page
         self.assertIsInstance(page, SettingsScreen)
-        self.assertEqual(
-            page.text_size_switch._items, ["Обычный", "Средний", "Большой"]
-        )
+        self.assertEqual(page.text_size_switch._items, ["Мелкий", "Средний", "Крупный"])
         self.assertEqual(page.text_size_switch.active, 0)
 
     def test_choice_applies_at_once_and_is_remembered(self):
