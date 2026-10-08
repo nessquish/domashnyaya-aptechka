@@ -17,7 +17,7 @@ from pharmacy.models import User
 from pharmacy.ui.fonts import font, line_height, text_width
 from pharmacy.ui.icons import icon_pixmap
 from pharmacy.ui.paint import Shadow, begin, draw_shadows, fill_rounded, qcolor
-from pharmacy.ui.widgets.common import label
+from pharmacy.ui.widgets.common import clickable, label
 from pharmacy.ui.widgets.iconbutton import IconButton
 from pharmacy.ui import theme
 from pharmacy.ui.theme import mix, palette
@@ -208,6 +208,7 @@ class Sidebar(QFrame):
         on_collapse: Callable[[], None],
         parent: Optional[QWidget] = None,
         icons: Optional[Dict[str, str]] = None,
+        on_profile: Optional[Callable[[], None]] = None,
     ) -> None:
         """Создаёт меню.
 
@@ -220,6 +221,7 @@ class Sidebar(QFrame):
             on_collapse: Вызывается при нажатии на кнопку сворачивания панели.
             parent: Родитель.
             icons: Значки пунктов по названию раздела (None: без значков).
+            on_profile: Вызывается при нажатии на аватар и имя пользователя.
         """
         super().__init__(parent)
         pal = palette()
@@ -251,7 +253,7 @@ class Sidebar(QFrame):
             outer.addWidget(item)
             self._items[name] = item
         outer.addStretch(1)
-        self._build_footer(outer, user, on_logout, on_toggle_theme)
+        self._build_footer(outer, user, on_logout, on_toggle_theme, on_profile)
 
     def paintEvent(self, event) -> None:
         super().paintEvent(event)
@@ -277,6 +279,7 @@ class Sidebar(QFrame):
         user: User,
         on_logout: Callable[[], None],
         on_toggle_theme: Callable[[], None],
+        on_profile: Optional[Callable[[], None]] = None,
     ) -> None:
         pal = palette()
         line = _Line()
@@ -285,7 +288,9 @@ class Sidebar(QFrame):
         line_row.addWidget(line)
         outer.addLayout(line_row)
 
-        person = QHBoxLayout()
+        # Нажатие на аватар и имя открывает профиль пользователя.
+        self.profile = QWidget()
+        person = QHBoxLayout(self.profile)
         person.setContentsMargins(NAV_PAD + 8, 14, NAV_PAD + 8, 6)
         person.setSpacing(8)
         person.addWidget(_Avatar(user.username[:1].upper()))
@@ -296,7 +301,9 @@ class Sidebar(QFrame):
         names.addWidget(label(user.login, "caption", "ink_3", tight=True))
         person.addLayout(names)
         person.addStretch(1)
-        outer.addLayout(person)
+        outer.addWidget(self.profile)
+        if on_profile is not None:
+            clickable(self.profile, on_profile)
 
         dark = theme.theme_name() == theme.DARK_THEME
         self.theme_link = _FooterLink(

@@ -14,7 +14,7 @@ from pharmacy.ui.screens.my_kit import MyKitScreen
 from pharmacy.ui.screens.notifications import NotificationsScreen
 from pharmacy.ui.screens.product_card import ProductCardDialog
 from pharmacy.ui.screens.product_form import ProductFormDialog
-from pharmacy.ui.screens.settings import SettingsScreen
+from pharmacy.ui.screens.settings import ACCOUNT, SettingsScreen
 from pharmacy.ui.screens.shopping import ShoppingScreen
 from pharmacy.ui.widgets.dialog import Dialog
 from pharmacy.ui.widgets.iconbutton import IconButton
@@ -118,6 +118,7 @@ class MainShell(QWidget):
                 if self.app.preferences.get(self.user.id, MENU_ICONS, True)
                 else None
             ),
+            on_profile=self.open_profile,
         )
         self._rail = _Rail(lambda: self.set_sidebar_collapsed(False))
         self._scroll = ScrollArea(gutter=CONTENT_PADDING_X)
@@ -167,6 +168,12 @@ class MainShell(QWidget):
         self.app.preferences.set(self.user.id, SIDEBAR_COLLAPSED, collapsed)
         self._sidebar.setVisible(not collapsed)
         self._rail.setVisible(collapsed)
+
+    def open_profile(self) -> None:
+        """Открывает профиль пользователя: настройки, раздел «Аккаунт»."""
+        self.navigate(sections.SETTINGS)
+        if isinstance(self._current, SettingsScreen):
+            self._current.open_section(ACCOUNT)
 
     def set_text_size(self, name: str) -> None:
         """Запоминает размер текста и сразу применяет его (окно строится заново)."""

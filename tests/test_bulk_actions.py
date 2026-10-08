@@ -148,3 +148,23 @@ class NarrowWindowTest(ShellTestCase):
 
     def test_window_can_be_narrower_than_the_content(self):
         self.assertLessEqual(self.app.minimumWidth(), 800)
+
+
+class ProfileLinkTest(ShellTestCase):
+    def test_click_on_the_user_opens_the_account(self):
+        click(self.shell.sidebar.profile)
+        self.settle()
+        self.assertEqual(self.shell.section, sections.SETTINGS)
+        self.assertEqual(self.page.section, "account")
+
+    def test_click_on_the_name_works_too(self):
+        from PySide6.QtWidgets import QLabel
+
+        name = next(
+            w
+            for w in self.shell.sidebar.profile.findChildren(QLabel)
+            if w.text() == "Анастасия"
+        )
+        click(name)
+        self.settle()
+        self.assertEqual(self.page.section, "account")
