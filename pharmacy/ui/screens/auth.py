@@ -30,7 +30,8 @@ HERO_ICON_SIZE = 60
 FORM_WIDTH = 440
 FORM_PADDING_X = 44
 GRADIENT_ANGLE = 160.0
-HERO_SOFTEN = 0.6  # доля цвета фона в цветах градиента: чем больше, тем слабее
+HERO_SOFTEN = 0.6  # тёмная тема: доля фона в цветах градиента, больше — слабее
+HERO_TINT = (0.09, 0.03)  # светлая тема: доля фиолетового в начале и конце градиента
 FADE_SHARE = 0.5  # какая часть левой панели справа уходит в цвет фона
 CHECK_SIZE = 14
 CHECK_GAP = 8
@@ -93,9 +94,16 @@ class _HeroPanel(QWidget):
         center = QPointF(width / 2, height / 2)
         shift = QPointF(dx * length / 2, dy * length / 2)
         gradient = QLinearGradient(center - shift, center + shift)
-        # Градиент едва заметный: цвета панели ближе к фону окна.
-        gradient.setColorAt(0, QColor(mix(pal.hero_from, pal.bg, HERO_SOFTEN)))
-        gradient.setColorAt(1, QColor(mix(pal.hero_to, pal.bg, HERO_SOFTEN)))
+        # Градиент слабый, но заметный: в тёмной теме цвета панели ближе к фону,
+        # в светлой слегка подкрашены фиолетовым.
+        if theme.theme_name() == theme.DARK_THEME:
+            start = mix(pal.hero_from, pal.bg, HERO_SOFTEN)
+            end = mix(pal.hero_to, pal.bg, HERO_SOFTEN)
+        else:
+            start = mix(pal.hero_from, pal.primary, HERO_TINT[0])
+            end = mix(pal.hero_to, pal.primary, HERO_TINT[1])
+        gradient.setColorAt(0, QColor(start))
+        gradient.setColorAt(1, QColor(end))
         painter = QPainter(self)
         painter.fillRect(self.rect(), gradient)
         # Плавный переход к фону правой половины, без резкой границы.
