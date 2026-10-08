@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import QPoint, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from pharmacy import GITHUB_URL, __build_date__, __developer__, __version__
 from pharmacy.errors import NotFoundError, ValidationError
-from pharmacy.ui import scaling, sections, theme
+from pharmacy.ui import paging, scaling, sections, theme
 from pharmacy.ui.preferences import (
     GLOBAL_USER,
     MENU_ICONS,
@@ -121,8 +121,23 @@ class SettingsScreen(QWidget):
 
     # --- каркас ---
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self.fit_rows)
+
+    def fit_rows(self) -> None:
+        """Вытягивает фон обеих карточек до низа окна (текст остаётся на месте)."""
+        height = self._shell.viewport_height()
+        if height <= 0 or not self.isVisible():
+            return
+        top = self._menu_card.mapTo(self, QPoint(0, 0)).y()
+        target = height - top - paging.BOTTOM_GAP
+        for card in (self._menu_card, self._page_card):
+            card.setMinimumHeight(max(target, 0))
+
     def _build_menu(self) -> Card:
         card = Card()
+        self._menu_card = card
         card.setFixedWidth(MENU_WIDTH + 2 * card.inner_inset)
         host = QWidget()
         column = QVBoxLayout(host)
@@ -137,6 +152,7 @@ class SettingsScreen(QWidget):
             item = NavItem(title, lambda k=key: self.open_section(k), icon=icon)
             column.addWidget(item)
             self._items[key] = item
+        column.addStretch(1)
         card.body.addWidget(host)
         return card
 
@@ -161,7 +177,8 @@ class SettingsScreen(QWidget):
         text = label(HINT, "body", "ink_3")
         text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.hint = text
-        self._page.addStretch(1)
+        # Подсказка стоит там же, где и раньше, даже когда фон вытянут до низа.
+        self._page.addSpacing(PAGE_MIN_HEIGHT // 2 - 24)
         self._page.addWidget(text)
         self._page.addStretch(1)
         for item in self._items.values():
