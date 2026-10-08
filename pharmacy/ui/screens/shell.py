@@ -103,11 +103,8 @@ class MainShell(QWidget):
         self._current: Optional[QWidget] = None
         self.section = start
         row = QHBoxLayout(self)
-        self._row = row
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(0)
-        self._narrow = False  # окно уже порога: панель прячется сама
-        self._drawer_open = False  # в узком окне панель открывают кнопкой
         self._sidebar = Sidebar(
             self.user,
             sections.ALL,
@@ -150,44 +147,14 @@ class MainShell(QWidget):
         """Свёрнута ли боковая панель."""
         return self._collapsed
 
-    @property
-    def narrow(self) -> bool:
-        """Окно настолько узкое, что боковая панель спрятана автоматически."""
-        return self._narrow
-
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        narrow = self.width() < theme.narrow_width()
-        if narrow != self._narrow:
-            self._narrow = narrow
-            self._drawer_open = False
-            self._place_sidebar()
         fit = getattr(self._current, "fit_rows", None)
         if fit is not None:
             QTimer.singleShot(0, fit)
 
-    def _place_sidebar(self) -> None:
-        """Прячет или показывает панель после смены ширины окна."""
-        if self._narrow:
-            self._show_drawer(self._drawer_open)
-            return
-        self._sidebar.setVisible(not self._collapsed)
-        self._rail.setVisible(self._collapsed)
-
-    def _show_drawer(self, opened: bool) -> None:
-        """В узком окне панель открывается в ряд и сдвигает содержимое."""
-        self._drawer_open = opened
-        self._sidebar.setVisible(opened)
-        self._rail.setVisible(not opened)
-
     def set_sidebar_collapsed(self, collapsed: bool) -> None:
-        """Сворачивает или разворачивает боковую панель и запоминает выбор.
-
-        В узком окне панель открывается в ряд, выбор не запоминается.
-        """
-        if self._narrow:
-            self._show_drawer(not collapsed)
-            return
+        """Сворачивает или разворачивает боковую панель и запоминает выбор."""
         if collapsed == self._collapsed:
             return
         self._collapsed = collapsed
@@ -211,8 +178,6 @@ class MainShell(QWidget):
         factory = self._sections.get(name)
         if factory is None:
             raise ValueError(f"Неизвестный раздел: {name}")
-        if self._narrow and self._drawer_open:
-            self._show_drawer(False)
         self.show_screen(factory, name)
 
     def show_screen(self, factory: ScreenFactory, section: str) -> None:

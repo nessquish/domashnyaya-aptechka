@@ -130,28 +130,21 @@ class ClearHistoryTest(ShellTestCase):
 
 
 class NarrowWindowTest(ShellTestCase):
-    def test_sidebar_hides_in_narrow_window(self):
+    def test_sidebar_is_never_hidden_automatically(self):
         self.app.resize(900, 640)
         self.settle()
-        self.assertTrue(self.shell.narrow)
+        self.assertTrue(self.shell.sidebar.isVisible())
+        self.assertFalse(self.shell.sidebar_collapsed)
+
+    def test_user_can_still_collapse_it(self):
+        self.app.resize(900, 640)
+        self.shell.set_sidebar_collapsed(True)
+        self.settle()
         self.assertFalse(self.shell.sidebar.isVisible())
         self.assertTrue(self.shell._rail.isVisible())
-        self.assertFalse(
-            self.app.preferences.get(self.app.user.id, "sidebar_collapsed", False)
-        )
-
-    def test_drawer_pushes_content_and_closes_on_navigation(self):
-        self.app.resize(900, 640)
-        self.settle()
-        self.shell.set_sidebar_collapsed(False)
-        self.assertTrue(self.shell.sidebar.isVisible())
-        self.shell.navigate(sections.HISTORY)
-        self.assertFalse(self.shell.sidebar.isVisible())
-
-    def test_sidebar_returns_when_window_widens(self):
-        self.app.resize(900, 640)
-        self.settle()
         self.app.resize(1300, 640)
         self.settle()
-        self.assertFalse(self.shell.narrow)
-        self.assertTrue(self.shell.sidebar.isVisible())
+        self.assertFalse(self.shell.sidebar.isVisible())
+
+    def test_window_can_be_narrower_than_the_content(self):
+        self.assertLessEqual(self.app.minimumWidth(), 800)
