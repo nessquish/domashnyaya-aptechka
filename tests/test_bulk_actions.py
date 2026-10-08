@@ -109,3 +109,21 @@ class ShoppingSelectionTest(ShellTestCase):
         self.page._mark_bought()
         open_items = self.services.shopping.list_items(self.app.user.id, False)
         self.assertEqual(len(open_items), 4)
+
+
+class ClearHistoryTest(ShellTestCase):
+    def test_clear_removes_only_own_history(self):
+        page = self.open(sections.HISTORY)
+        self.assertTrue(self.services.history.list_history(self.app.user.id))
+        self.assertTrue(page.clear_button.isEnabled())
+        page._clear()
+        self.assertEqual(self.services.history.list_history(self.app.user.id), [])
+        self.assertEqual(page.event_rows, [])
+        self.assertFalse(page.clear_button.isEnabled())
+
+    def test_button_asks_for_confirmation(self):
+        page = self.open(sections.HISTORY)
+        page.clear_button.invoke()
+        self.settle()
+        self.assertTrue(self.buttons("Очистить"))
+        self.assertTrue(self.services.history.list_history(self.app.user.id))

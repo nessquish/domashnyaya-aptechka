@@ -8,7 +8,9 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from pharmacy.models import HistoryRecord
 from pharmacy.ui.fonts import line_height
+from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
+from pharmacy.ui.widgets.dialog import Dialog
 from pharmacy.ui.widgets.common import Line, clear_layout, label, pad
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.iconbox import IconBox
@@ -84,6 +86,10 @@ class HistoryScreen(QWidget):
         for widget in (self._search, self.action_select, self.period_select):
             header.actions.addWidget(widget, 0, Qt.AlignmentFlag.AlignTop)
             header.actions.addSpacing(gap)
+        self.clear_button = Button(
+            "Очистить историю", self._confirm_clear, variant="danger"
+        )
+        header.actions.addWidget(self.clear_button, 0, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(header)
         self._card = Card()
         self._list = QVBoxLayout()
@@ -125,6 +131,9 @@ class HistoryScreen(QWidget):
         try:
             clear_layout(self._list)
             groups = group_by_day(self._records())
+            self.clear_button.setEnabled(
+                bool(self._services.history.list_history(self._user.id, limit=1))
+            )
             if not groups:
                 message = label(EMPTY_TEXT, "body", "ink_3")
                 message.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -184,6 +193,22 @@ class HistoryScreen(QWidget):
         self._list.addWidget(row)
 
     # --- события ---
+
+    def _confirm_clear(self) -> None:
+        Dialog(
+            self._shell.app,
+            "Очистить историю?",
+            "Все записи истории будут удалены без возможности восстановления. "
+            "Товары и список покупок не изменятся.",
+            "Очистить",
+            self._clear,
+            confirm_variant="danger_solid",
+            warning=True,
+        )
+
+    def _clear(self) -> None:
+        self._services.history.clear(self._user.id)
+        self._reload()
 
     def _on_search(self) -> None:
         self._timer.start()
