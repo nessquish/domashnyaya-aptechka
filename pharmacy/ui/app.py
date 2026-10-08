@@ -53,6 +53,7 @@ class App(QMainWindow):
         self.user: Optional[User] = None
         self.session_password = ""
         self._screen: Optional[QWidget] = None
+        theme.set_theme(runtime.system_theme())
         self.setWindowTitle(WINDOW_TITLE)
         self.setWindowIcon(runtime.app_icon())
         self.setMinimumSize(theme.WINDOW_WIDTH, theme.WINDOW_HEIGHT)
@@ -184,7 +185,7 @@ class App(QMainWindow):
         self.user = None
         self.session_password = ""
         self.remembered.clear()
-        theme.set_theme(theme.LIGHT_THEME)
+        theme.set_theme(runtime.system_theme())
         theme.set_text_size(theme.DEFAULT_TEXT_SIZE)
         self.setMinimumSize(theme.WINDOW_WIDTH, theme.WINDOW_HEIGHT)
         self.show_login()

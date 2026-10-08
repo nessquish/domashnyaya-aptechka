@@ -13,6 +13,7 @@ from pharmacy.ui.theme import LIGHT
 
 ICON_SIZES = (16, 32, 48, 64, 128, 256)
 _translators: list = []
+_system_theme = "light"
 
 
 def application() -> QApplication:
@@ -25,7 +26,10 @@ def application() -> QApplication:
 
 
 def _setup(app: QApplication) -> None:
+    global _system_theme
     app.setStyle("Fusion")
+    dark = app.styleHints().colorScheme() == Qt.ColorScheme.Dark
+    _system_theme = "dark" if dark else "light"
     # Цвета рисуем сами по теме приложения, а настройка тёмного режима Windows
     # не должна красить стандартные части (меню, подсказки).
     app.styleHints().setColorScheme(Qt.ColorScheme.Light)
@@ -37,6 +41,12 @@ def _setup(app: QApplication) -> None:
             app.installTranslator(translator)
             _translators.append(translator)
     fonts.register_fonts()
+
+
+def system_theme() -> str:
+    """Тема операционной системы: ``light`` или ``dark`` (определена при запуске)."""
+    application()
+    return _system_theme
 
 
 def render_app_icon(size: int) -> QPixmap:
