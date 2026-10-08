@@ -17,6 +17,7 @@ CELL_PADDING_X = 12
 CELL_PADDING_Y = 9
 SORT_ICON = 12
 SORT_GAP = 4
+SELECT_WIDTH = 44  # столбец с флажками, если таблица с выбором строк
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,7 @@ class DataTable(QWidget):
         columns: Sequence[Column],
         card: Optional[Card] = None,
         parent: Optional[QWidget] = None,
+        selectable: bool = False,
     ) -> None:
         """Создаёт таблицу без строк.
 
@@ -104,10 +106,17 @@ class DataTable(QWidget):
             card: Карточка, в которую вставлена таблица. Она красит шапку
                 вместе со скруглёнными верхними углами.
             parent: Родитель.
+            selectable: Добавить слева столбец с флажками. Номера столбцов в
+                методах таблицы при этом остаются прежними: флажки считаются
+                отдельно (флажок в шапке: ``set_header_widget(-1, ...)``).
         """
         super().__init__(parent)
         self._card = card
-        self._columns = list(columns)
+        self._offset = 1 if selectable else 0
+        self._columns = ([Column("", fixed=SELECT_WIDTH)] if selectable else []) + list(
+            columns
+        )
+        self._fills: Dict[int, QWidget] = {}
         self._caption_column: Optional[int] = None
         self._caption = ""
         self._header_clicks: Dict[int, Callable[[], None]] = {}
@@ -184,7 +193,7 @@ class DataTable(QWidget):
             index: Номер столбца.
             text: Короткая подпись.
         """
-        self._caption_column = index
+        self._caption_column = None if index is None else index + self._offset
         self._caption = text
         self._build_header()
 
@@ -198,12 +207,14 @@ class DataTable(QWidget):
             command: Что вызвать при нажатии на заголовок.
             tip: Подсказка при наведении.
         """
+        index += self._offset
         self._header_clicks[index] = command
         self._header_tips[index] = tip
         self._build_header()
 
     def set_header_tip(self, index: int, tip: str) -> None:
         """Меняет подсказку заголовка столбца."""
+        index += self._offset
         self._header_tips[index] = tip
         if index < len(self._header_cells):
             self._header_cells[index].setToolTip(tip)
@@ -232,7 +243,7 @@ class DataTable(QWidget):
             Созданный виджет.
         """
         widget = factory()
-        self._header_widgets[index] = widget
+        self._header_widgets[index + self._offset] = widget
         self._build_header()
         return widget
 
@@ -246,6 +257,7 @@ class DataTable(QWidget):
             widget.deleteLater()
         self._rows = []
         self._cells = []
+        self._fills = {}
         self._next_row = 1
         self._data_rows = 0
 
@@ -257,26 +269,66 @@ class DataTable(QWidget):
         self._add(_Fill(palette().line, 1), self._next_row, 0, len(self._columns))
         self._next_row += 1
 
-    def add_row(self, cells: Sequence[Cell], selected: bool = False) -> None:
+    def add_row(
+        self,
+        cells: Sequence[Cell],
+        selected: bool = False,
+        check: Optional[Callable[[], QWidget]] = None,
+        on_click: Optional[Callable[[], None]] = None,
+    ) -> None:
         """Добавляет строку.
 
         Args:
             cells: Содержимое ячеек по столбцам: текст, ``TextCell`` или
                 функция, создающая виджет.
             selected: Подсветить строку (выбранная или непрочитанная).
+            check: Создаёт флажок строки (для таблицы с ``selectable``).
+            on_click: Нажатие на свободное место строки (например, выбрать её).
         """
         self._separator()
         row = self._next_row
         self._next_row += 1
-        self._data_rows += 1
+        if self._offset:
+            cells = [check or ""] + list(cells)
         if selected:
-            self._add(_Fill(palette().unread_bg), row, 0, len(self._columns))
+            self.set_row_selected(self._data_rows, True, row)
+        self._data_rows += 1
         wrappers = []
         for index, cell in enumerate(cells):
             wrapper = self._make_cell(cell, self._columns[index])
+            if on_click is not None and self._columns[index].fixed is None:
+                clickable(wrapper, on_click)  # столбец с флажком не в счёт
             self._add(wrapper, row, index)
             wrappers.append(wrapper)
         self._cells.append(wrappers)
+
+    def set_row_selected(
+        self, index: int, selected: bool, grid_row: Optional[int] = None
+    ) -> None:
+        """Подсвечивает или снимает подсветку строки, не перестраивая таблицу.
+
+        Args:
+            index: Номер строки с данными (с нуля).
+            selected: Подсветить или снять подсветку.
+            grid_row: Строка сетки (только при добавлении строки).
+        """
+        fill = self._fills.get(index)
+        if not selected:
+            if fill is not None:
+                del self._fills[index]
+                self._rows.remove(fill)
+                self._grid.removeWidget(fill)
+                fill.setParent(None)
+                fill.deleteLater()
+            return
+        if fill is not None:
+            return
+        if grid_row is None:
+            grid_row = 2 + 2 * index  # разделитель и строка идут парами
+        fill = _Fill(palette().unread_bg)
+        self._fills[index] = fill
+        self._add(fill, grid_row, 0, len(self._columns))
+        fill.lower()
 
     def add_message(self, text: str) -> None:
         """Добавляет строку с сообщением на всю ширину («Ничего не найдено»)."""
@@ -303,7 +355,7 @@ class DataTable(QWidget):
         rows = []
         for wrappers in self._cells:
             texts = []
-            for wrapper in wrappers:
+            for wrapper in wrappers[self._offset :]:
                 item = wrapper.layout().itemAt(0)
                 content = item.widget() if item is not None else None
                 if isinstance(content, QLabel):
@@ -314,8 +366,13 @@ class DataTable(QWidget):
             rows.append(texts)
         return rows
 
+    def check_widgets(self) -> List[QWidget]:
+        """Флажки строк (для таблицы с ``selectable``)."""
+        return [wrappers[0].layout().itemAt(0).widget() for wrappers in self._cells]
+
     def cell_widgets(self, column: int) -> List[QWidget]:
         """Содержимое ячеек одного столбца по строкам (виджеты, не обёртки)."""
+        column += self._offset
         return [
             wrappers[column].layout().itemAt(0).widget() for wrappers in self._cells
         ]
@@ -323,7 +380,9 @@ class DataTable(QWidget):
     @property
     def caption_column(self) -> Optional[int]:
         """Столбец, рядом с заголовком которого показана подпись сортировки."""
-        return self._caption_column
+        if self._caption_column is None:
+            return None
+        return self._caption_column - self._offset
 
     @property
     def caption(self) -> str:

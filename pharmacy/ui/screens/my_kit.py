@@ -1,16 +1,19 @@
 """Экран «Моя аптечка» (макет Figma, экраны 04 и 15): таблица товаров."""
 
 import math
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Set
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
+from pharmacy.ui.widgets.actionbar import HEIGHT as BAR_HEIGHT, ActionBar
 from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
 from pharmacy.ui.widgets.common import Line, clear_layout, label
-from pharmacy.ui.widgets.controls import Pagination
+from pharmacy.ui.widgets.controls import Checkbox, Pagination
+from pharmacy.ui.widgets.dialog import Dialog
+from pharmacy.ui.widgets.popup import PopupList
 from pharmacy.ui.widgets.empty import EmptyState
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.page import ACTION_INSET, PageHeader
@@ -72,6 +75,9 @@ class MyKitScreen(QWidget):
         self._sort = saved if sorting.is_sort(saved) else sorting.DEFAULT_SORT
         self._page = 1
         self._page_size = remembered_rows(PAGING_KEY)
+        self._selected: Set[int] = set()  # отмеченные товары (на всех страницах)
+        self._shown_ids: List[int] = []
+        self._total = 0
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(SEARCH_DELAY_MS)
@@ -224,6 +230,7 @@ class MyKitScreen(QWidget):
             self._table.row_count,
             self._page_size,
             self._shell.viewport_height(),
+            0 if self._bar.isVisible() else BAR_HEIGHT,
         )
         if size != self._page_size:
             first = (self._page - 1) * self._page_size
@@ -246,7 +253,35 @@ class MyKitScreen(QWidget):
     def _build_table(self) -> None:
         card = Card(flush=True)
         self._card = card
-        self._table = DataTable(COLUMNS, card)
+        self._bar = ActionBar(card)
+        self.clear_button = Button("Снять выбор", self._clear_selection, size="sm")
+        self.all_button = Button("Выбрать все", self._select_everything, size="sm")
+        self.category_button = Button(
+            "Сменить категорию", self._open_category_list, size="sm"
+        )
+        self.shopping_button = Button(
+            "В список покупок",
+            self._add_to_shopping,
+            variant="primary",
+            size="sm",
+            icon="plus",
+        )
+        self.delete_button = Button(
+            "Удалить выбранные", self._confirm_delete, variant="danger", size="sm"
+        )
+        for button in (
+            self.clear_button,
+            self.all_button,
+            self.category_button,
+            self.shopping_button,
+            self.delete_button,
+        ):
+            self._bar.buttons.addWidget(button)
+        card.body.addWidget(self._bar)
+        self._table = DataTable(COLUMNS, card, selectable=True)
+        self._select_page = self._table.set_header_widget(
+            -1, lambda: Checkbox(False, self._toggle_page)
+        )
         for kind in sorting.SORT_KINDS:
             if kind.column is not None:
                 self._table.set_header_click(
@@ -271,13 +306,131 @@ class MyKitScreen(QWidget):
         try:
             self._show_sort()
             self._table.clear()
+            self._shown_ids = [view.product.id for view in shown]
+            self._total = len(views)
             if not shown:
                 self._table.add_message("Ничего не найдено")
             for view in shown:
-                self._table.add_row(self._cells(view))
+                pid = view.product.id
+                self._table.add_row(
+                    self._cells(view),
+                    pid in self._selected,
+                    check=lambda i=pid: Checkbox(
+                        i in self._selected, lambda v, i=i: self._toggle(i, v)
+                    ),
+                    on_click=lambda i=pid: self._flip(i),
+                )
             self._build_footer(len(views), start, len(shown), pages)
+            self._update_bar()
         finally:
             self.setUpdatesEnabled(True)
+
+    # --- выбор строк и массовые действия ---
+
+    @property
+    def selected(self) -> Set[int]:
+        """Номера отмеченных товаров."""
+        return set(self._selected)
+
+    @property
+    def bar(self) -> ActionBar:
+        """Панель действий над отмеченными товарами."""
+        return self._bar
+
+    @property
+    def select_page(self) -> Checkbox:
+        """Общий флажок в шапке: отметить товары страницы."""
+        return self._select_page
+
+    def _toggle(self, product_id: int, value: bool) -> None:
+        if value:
+            self._selected.add(product_id)
+        else:
+            self._selected.discard(product_id)
+        if product_id in self._shown_ids:
+            self._table.set_row_selected(self._shown_ids.index(product_id), value)
+        self._update_bar()
+
+    def _flip(self, product_id: int) -> None:
+        """Нажатие на свободное место строки отмечает или снимает отметку."""
+        self._toggle(product_id, product_id not in self._selected)
+        for box, shown_id in zip(self._table.check_widgets(), self._shown_ids):
+            box.set(shown_id in self._selected)
+
+    def _toggle_page(self, value: bool) -> None:
+        for product_id in self._shown_ids:
+            if value:
+                self._selected.add(product_id)
+            else:
+                self._selected.discard(product_id)
+        self._reload()
+
+    def _select_everything(self) -> None:
+        """Отмечает все товары, подходящие под поиск и фильтры, на всех страницах."""
+        self._selected |= {view.product.id for view in self._load()}
+        self._reload()
+
+    def _clear_selection(self) -> None:
+        self._selected.clear()
+        self._reload()
+
+    def _update_bar(self) -> None:
+        count = len(self._selected)
+        self._table.set_rounded_top(not count)
+        if count:
+            self._bar.show_bar(f"Выбрано: {count}")
+        else:
+            self._bar.hide_bar()
+        self.all_button.setVisible(count < self._total)
+        everything = bool(self._shown_ids) and all(
+            i in self._selected for i in self._shown_ids
+        )
+        self._select_page.set(everything)
+
+    def _finish(self, message: str) -> None:
+        """Снимает отметки и на пару секунд показывает итог действия в панели."""
+        self._selected.clear()
+        self._reload()
+        self._bar.flash(message, self._update_bar)
+        self._table.set_rounded_top(False)
+
+    def _add_to_shopping(self) -> None:
+        added, skipped = self._services.shopping.add_products(
+            self._user.id, sorted(self._selected)
+        )
+        text = f"Добавлено в список покупок: {added}"
+        if skipped:
+            text += f" (уже в списке: {skipped})"
+        self._finish(text)
+
+    def _confirm_delete(self) -> None:
+        Dialog(
+            self._shell.app,
+            "Удалить выбранные товары?",
+            f"Товаров к удалению: {len(self._selected)}. "
+            "Это действие нельзя отменить.",
+            "Удалить",
+            self._delete_selected,
+            confirm_variant="danger_solid",
+            warning=True,
+        )
+
+    def _delete_selected(self) -> None:
+        deleted = self._services.products.delete_products(
+            self._user.id, sorted(self._selected)
+        )
+        self._shell.refresh_counters()
+        self._finish(f"Удалено товаров: {deleted}")
+
+    def _open_category_list(self) -> None:
+        options = [(c.id, c.name) for c in self._services.products.list_categories()]
+        PopupList(self.category_button, options, None, self._change_category)
+
+    def _change_category(self, category_id: object) -> None:
+        changed = self._services.products.change_category(
+            self._user.id, sorted(self._selected), int(category_id)
+        )
+        self._finish(f"Категория изменена у товаров: {changed}")
 
     def _show_sort(self) -> None:
         """Подпись сортировки (фиолетовая) только рядом с выбранным столбцом."""

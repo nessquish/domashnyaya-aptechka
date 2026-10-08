@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from pharmacy.errors import ValidationError
 from pharmacy.models import ShoppingItem, ShoppingSource
-from pharmacy.ui.widgets.actionbar import ActionBar
+from pharmacy.ui.widgets.actionbar import HEIGHT as BAR_HEIGHT, ActionBar
 from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
@@ -76,8 +76,10 @@ class ShoppingScreen(QWidget):
         self._filter = tab
         self._selected: Set[int] = set()
         self._visible: List[ShoppingItem] = []  # позиции текущей страницы
+        self._found: List[ShoppingItem] = []  # все позиции вкладки
         self._page = 1
         self._page_size = remembered_rows(PAGING_KEY)
+        self._returning = False
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(0)
@@ -117,8 +119,15 @@ class ShoppingScreen(QWidget):
             variant="danger",
             size="sm",
         )
-        self._bar.buttons.addWidget(self.bought_button)
-        self._bar.buttons.addWidget(self.remove_button)
+        self.clear_button = Button("Снять выбор", self._clear_selection, size="sm")
+        self.all_button = Button("Выбрать все", self._select_everything, size="sm")
+        for button in (
+            self.clear_button,
+            self.all_button,
+            self.bought_button,
+            self.remove_button,
+        ):
+            self._bar.buttons.addWidget(button)
         card.body.addWidget(self._bar)
         self._table = DataTable(COLUMNS, card)
         card.body.addWidget(self._table)
@@ -170,6 +179,7 @@ class ShoppingScreen(QWidget):
     def _reload(self) -> None:
         """Заново читает список и перерисовывает вкладки, панель и таблицу."""
         found = self._services.shopping.list_items(self._user.id, FILTERS[self._filter])
+        self._found = found
         self._selected &= {item.id for item in found}
         size = self._page_size
         pages = max(math.ceil(len(found) / size), 1)
@@ -183,7 +193,11 @@ class ShoppingScreen(QWidget):
             if not self._visible:
                 self._table.add_message(EMPTY_TEXT)
             for item in self._visible:
-                self._table.add_row(self._cells(item), item.id in self._selected)
+                self._table.add_row(
+                    self._cells(item),
+                    item.id in self._selected,
+                    on_click=lambda i=item.id: self._flip(i),
+                )
             self._build_footer(len(found), start, pages)
             self._update_bar()
         finally:
@@ -258,6 +272,7 @@ class ShoppingScreen(QWidget):
             self._table.row_count,
             self._page_size,
             self._shell.viewport_height(),
+            0 if self._bar.isVisible() else BAR_HEIGHT,
         )
         if size != self._page_size:
             first = (self._page - 1) * self._page_size
@@ -276,8 +291,19 @@ class ShoppingScreen(QWidget):
             self._bar.show_bar(f"Выбрано: {count}")
         else:
             self._bar.hide_bar()
+        self.all_button.setVisible(count < len(self._found))
+        self._show_bought_action()
         everything = bool(self._visible) and count == len(self._visible)
         self._select_all.set(everything)
+
+    def _show_bought_action(self) -> None:
+        """Если все выбранные уже куплены, кнопка возвращает их в список."""
+        chosen = [item for item in self._found if item.id in self._selected]
+        returning = bool(chosen) and all(item.is_bought for item in chosen)
+        self.bought_button.set_text(
+            "Вернуть в список" if returning else "Отметить как купленные"
+        )
+        self._returning = returning
 
     # --- события ---
 
@@ -292,6 +318,24 @@ class ShoppingScreen(QWidget):
             self._selected.add(item_id)
         else:
             self._selected.discard(item_id)
+        ids = [item.id for item in self._visible]
+        if item_id in ids:
+            self._table.set_row_selected(ids.index(item_id), value)
+        self._update_bar()
+
+    def _flip(self, item_id: int) -> None:
+        """Нажатие на свободное место строки отмечает или снимает отметку."""
+        self._toggle(item_id, item_id not in self._selected)
+        for box, item in zip(self._table.cell_widgets(0), self._visible):
+            box.set(item.id in self._selected)
+
+    def _clear_selection(self) -> None:
+        self._selected.clear()
+        self._reload()
+
+    def _select_everything(self) -> None:
+        """Отмечает все позиции вкладки, на всех страницах."""
+        self._selected = {item.id for item in self._found}
         self._reload()
 
     def _toggle_all(self, value: bool) -> None:
@@ -300,7 +344,9 @@ class ShoppingScreen(QWidget):
 
     def _mark_bought(self) -> None:
         for item_id in sorted(self._selected):
-            self._services.shopping.set_bought(self._user.id, item_id, True)
+            self._services.shopping.set_bought(
+                self._user.id, item_id, not self._returning
+            )
         self._selected.clear()
         self._reload()
 

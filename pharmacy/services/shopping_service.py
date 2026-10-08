@@ -1,6 +1,6 @@
 """Список покупок: ручное добавление, добавление по товару, отметка «куплено»."""
 
-from typing import List, Optional
+from typing import List, Optional, Sequence, Tuple
 
 from pharmacy.db.connection import Database
 from pharmacy.errors import NotFoundError, ValidationError
@@ -111,6 +111,24 @@ class ShoppingService:
             ShoppingSource.NOTIFICATION,
             product.id,
         )
+
+    def add_products(self, user_id: int, product_ids: Sequence[int]) -> Tuple[int, int]:
+        """Добавляет в список покупок несколько товаров аптечки.
+
+        Товары, которые уже в списке (не куплены), и недоступные пропускаются.
+
+        Returns:
+            Пара: сколько добавлено и сколько пропущено.
+        """
+        added = skipped = 0
+        for product_id in product_ids:
+            try:
+                self.add_from_product(user_id, product_id)
+            except (NotFoundError, ValidationError):
+                skipped += 1
+                continue
+            added += 1
+        return added, skipped
 
     def is_in_list(self, user_id: int, product_id: int) -> bool:
         """Проверяет, есть ли товар в списке покупок среди не купленных."""

@@ -1,9 +1,9 @@
 """Бизнес-логика работы с товарами аптечки."""
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from pharmacy.db.connection import Database
 from pharmacy.errors import NotFoundError, ValidationError
@@ -116,6 +116,21 @@ def _check_length(text: str, limit: int, label: str, field_name: str) -> str:
     if len(text) > limit:
         raise ValidationError(f"{label}: не больше {limit} символов", field_name)
     return text
+
+
+def _to_data(product: Product) -> ProductData:
+    """Данные товара в виде, готовом к записи (чтобы изменить одно поле)."""
+    return ProductData(
+        name=product.name,
+        category_id=product.category_id,
+        quantity=product.quantity,
+        unit=product.unit,
+        expiry_date=product.expiry_date,
+        indications=product.indications,
+        storage_place=product.storage_place,
+        min_quantity=product.min_quantity,
+        note=product.note,
+    )
 
 
 def _describe_changes(old: Product, new: ProductData) -> str:
@@ -307,6 +322,54 @@ class ProductService:
                 conn,
             )
             self._products.delete(user_id, product_id, conn)
+
+    def delete_products(self, user_id: int, product_ids: Sequence[int]) -> int:
+        """Удаляет несколько товаров. Чужие и уже удалённые пропускаются.
+
+        Returns:
+            Сколько товаров удалено.
+        """
+        deleted = 0
+        for product_id in product_ids:
+            try:
+                self.delete_product(user_id, product_id)
+            except NotFoundError:
+                continue
+            deleted += 1
+        return deleted
+
+    def change_category(
+        self, user_id: int, product_ids: Sequence[int], category_id: int
+    ) -> int:
+        """Переносит несколько товаров в другую категорию.
+
+        Каждое изменение записывается в историю, как обычное редактирование.
+
+        Returns:
+            Сколько товаров перенесено (те, что уже в этой категории, не считаются).
+
+        Raises:
+            ValidationError: Если такой категории нет.
+        """
+        if self._categories.get(category_id) is None:
+            raise ValidationError("Выберите категорию", "category_id")
+        changed = 0
+        for product_id in product_ids:
+            old = self._products.get(user_id, product_id)
+            if old is None or old.category_id == category_id:
+                continue
+            data = replace(_to_data(old), category_id=category_id)
+            with self._db.transaction() as conn:
+                self._products.update(user_id, product_id, data, conn)
+                self._history.add(
+                    user_id,
+                    product_id,
+                    HistoryAction.PRODUCT_UPDATED,
+                    f"{old.name} · {_describe_changes(old, data)}",
+                    conn,
+                )
+            changed += 1
+        return changed
 
     def get_product(
         self, user_id: int, product_id: int, today: Optional[date] = None

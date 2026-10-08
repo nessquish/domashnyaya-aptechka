@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pharmacy.ui.widgets.card import Card
@@ -58,6 +59,25 @@ class ActionBar(QWidget):
         self._text.setText(text)
         self._card.set_band(HEIGHT, palette().bulk_bg)
         self.setVisible(True)
+
+    def flash(self, text: str, on_done, ms: int = 2500) -> None:
+        """Показывает короткое сообщение вместо кнопок и потом вызывает ``on_done``."""
+        self.show_bar(text)
+        for index in range(self.buttons.count()):
+            widget = self.buttons.itemAt(index).widget()
+            if widget is not None:
+                widget.setVisible(False)
+        QTimer.singleShot(ms, lambda: self._unflash(on_done))
+
+    def _unflash(self, on_done) -> None:
+        try:
+            for index in range(self.buttons.count()):
+                widget = self.buttons.itemAt(index).widget()
+                if widget is not None:
+                    widget.setVisible(True)
+            on_done()
+        except RuntimeError:  # экран уже закрыт
+            pass
 
     def hide_bar(self) -> None:
         """Прячет панель (полосу карточки возвращает тот, кто её занимал раньше)."""

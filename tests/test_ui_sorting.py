@@ -123,7 +123,7 @@ class DefaultSortTest(SortTestCase):
         self.assertEqual(table.caption, "просроч.")
 
     def test_expiry_header_has_no_arrow_or_caption_any_more(self):
-        texts = [w.text() for w in self.kit.table._header_cells[4].findChildren(QLabel)]
+        texts = [w.text() for w in self.kit.table._header_cells[5].findChildren(QLabel)]
         self.assertEqual(texts, ["Срок годности"])
 
 
@@ -311,7 +311,7 @@ class EverySortTest(SortTestCase):
 class HeaderCaptionTest(SortTestCase):
     def caption_columns(self):
         return [
-            index
+            index - 1  # первый столбец с флажками не считается
             for index, cell in enumerate(self.kit.table._header_cells)
             if len(cell.findChildren(QLabel)) > 1
         ]
@@ -336,7 +336,7 @@ class HeaderCaptionTest(SortTestCase):
 
     def test_caption_is_purple_text_in_the_header(self):
         self.choose("name", "name")
-        label = self.kit.table._header_cells[0].findChildren(QLabel)[-1]
+        label = self.kit.table._header_cells[1].findChildren(QLabel)[-1]
         self.assertEqual(label.text(), "А-Я")
         self.assertEqual(
             label.palette().windowText().color().name().upper(),
@@ -357,7 +357,7 @@ class HeaderCaptionTest(SortTestCase):
 
 class HeaderClickTest(SortTestCase):
     def head(self, index):
-        return self.kit.table._header_cells[index]
+        return self.kit.table._header_cells[index + 1]
 
     def test_click_on_the_sorted_column_flips_the_direction(self):
         self.choose("name", "name")

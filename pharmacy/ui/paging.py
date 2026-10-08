@@ -34,6 +34,7 @@ def fitted_rows(
     shown: int,
     current: int,
     viewport_height: int,
+    reserve: int = 0,
 ) -> int:
     """Считает, сколько строк поместится на странице.
 
@@ -46,6 +47,7 @@ def fitted_rows(
         shown: Сколько строк показано сейчас.
         current: Размер страницы сейчас.
         viewport_height: Высота видимой области окна.
+        reserve: Сколько места оставить про запас (панель действий, пока скрыта).
 
     Returns:
         Новый размер страницы (не меньше ``MIN_ROWS``).
@@ -56,7 +58,7 @@ def fitted_rows(
     if row_height <= 0:
         return current
     bottom = card.mapTo(screen, QPoint(0, card.height())).y()
-    free = viewport_height - bottom - BOTTOM_GAP
+    free = viewport_height - bottom - BOTTOM_GAP - reserve
     rows = shown + int(free // row_height)
     rows = max(MIN_ROWS, min(rows, MAX_ROWS))
     _remembered[key] = rows
