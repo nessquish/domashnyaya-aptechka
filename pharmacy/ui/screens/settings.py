@@ -794,37 +794,38 @@ class _FormModal(Modal):
         raise NotImplementedError
 
 
+# Что меняет каждое окно: ключ поля, заголовок окна, подпись поля.
+PROFILE_FIELDS = {
+    "username": ("Изменить имя", "Имя пользователя"),
+    "login": ("Изменить логин", "Логин"),
+    "email": ("Изменить почту", "Электронная почта"),
+}
+
+
 class ProfileModal(_FormModal):
-    """Изменение имени, логина и электронной почты."""
+    """Отдельное окно для одного поля профиля: имени, логина или почты."""
 
     def __init__(
-        self, app, services, user, screen: SettingsScreen, focus: str = "username"
+        self, app, services, user, screen: SettingsScreen, key: str = "username"
     ) -> None:
-        super().__init__(
-            app,
-            "Изменить данные",
-            [
-                ("username", "Имя пользователя", False),
-                ("login", "Логин", False),
-                ("email", "Эл. почта", False),
-            ],
-            "Сохранить",
-        )
+        title, caption = PROFILE_FIELDS[key]
+        super().__init__(app, title, [(key, caption, False)], "Сохранить")
+        self._key = key
         self._services = services
         self._user = user
         self._screen = screen
-        self.fields["username"].set(user.username)
-        self.fields["login"].set(user.login)
-        self.fields["email"].set(user.email)
-        self.fields.get(focus, self.fields["username"]).focus_field()
+        self.fields[key].set(getattr(user, key))
 
     def _submit(self) -> None:
+        values = {
+            "username": self._user.username,
+            "login": self._user.login,
+            "email": self._user.email,
+        }
+        values[self._key] = self.fields[self._key].get()
         try:
             user = self._services.settings.update_profile(
-                self._user.id,
-                self.fields["username"].get(),
-                self.fields["email"].get(),
-                self.fields["login"].get(),
+                self._user.id, values["username"], values["email"], values["login"]
             )
         except ValidationError as error:
             self._show_error(error)

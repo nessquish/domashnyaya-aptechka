@@ -275,21 +275,31 @@ class AccountTest(SettingsTestCase):
         self.assertIn("nessquish", texts)
         self.assertIn("Анастасия", texts)
 
-    def test_profile_modal_saves_name_and_email(self):
+    def test_name_modal_saves_the_name(self):
+        page = self.section(ACCOUNT)
+        page.edit_name_button.invoke()
+        self.settle()
+        modal = page.profile_modal
+        self.assertEqual(list(modal.fields), ["username"])
+        modal.fields["username"].set("Анна")
+        modal._submit()
+        self.settle()
+        self.assertEqual(self.user().username, "Анна")
+        self.assertEqual(self.page.section, ACCOUNT)
+
+    def test_email_modal_saves_the_email(self):
         page = self.section(ACCOUNT)
         page.edit_email_button.invoke()
         self.settle()
         modal = page.profile_modal
-        modal.fields["username"].set("Анна")
+        self.assertEqual(list(modal.fields), ["email"])
         modal.fields["email"].set("new@mail.ru")
         modal._submit()
         self.settle()
-        self.assertEqual(
-            (self.user().username, self.user().email), ("Анна", "new@mail.ru")
-        )
-        self.assertEqual(self.page.section, ACCOUNT)
+        self.assertEqual(self.user().email, "new@mail.ru")
+        self.assertEqual(self.user().username, "Анастасия")
 
-    def test_profile_modal_marks_a_bad_email(self):
+    def test_email_modal_marks_a_bad_email(self):
         page = self.section(ACCOUNT)
         page.edit_email_button.invoke()
         self.settle()
