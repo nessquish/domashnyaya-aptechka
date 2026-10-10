@@ -208,14 +208,17 @@ class App(QMainWindow):
             expiring=bool(prefs.get(user_id, "notify_expiring", True)),
             low_threshold=float(prefs.get(user_id, "low_threshold", 0) or 0),
         )
-
+        
     def theme_mode(self, user: User) -> str:
-        """Выбор темы пользователя: ``light``, ``dark`` или ``system``."""
-        mode = self.preferences.get(user.id, THEME_MODE, user.theme)
+        """Тема оформления — настройка устройства, общая для всех аккаунтов.
+
+        Хранится в preferences под ``GLOBAL_USER``. По умолчанию — системная.
+        """
+        mode = self.preferences.get(GLOBAL_USER, THEME_MODE, SYSTEM_THEME)
         return (
             mode
             if mode in (theme.LIGHT_THEME, theme.DARK_THEME, SYSTEM_THEME)
-            else user.theme
+            else SYSTEM_THEME
         )
 
     def resolve_theme(self, user: User) -> str:
@@ -277,7 +280,6 @@ class App(QMainWindow):
             max((screen_width - self.width()) // 2, 0),
             max((screen_height - self.height()) // 2, 0),
         )
-
 
 def prepare_demo(db: Database) -> None:
     """В демо-сборке при первом запуске создаёт тестовый аккаунт со всеми данными."""

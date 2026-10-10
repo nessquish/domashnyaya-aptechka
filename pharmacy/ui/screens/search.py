@@ -18,6 +18,8 @@ from pharmacy.ui.search_index import (
 from pharmacy.ui.theme import mix, palette
 from pharmacy.ui.widgets.common import clickable, clear_layout, label, pad
 from pharmacy.ui.widgets.dialog import Modal
+from pharmacy.ui import theme
+from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.scroll import ScrollArea
 from pharmacy.utils.formatting import format_quantity
@@ -104,7 +106,19 @@ class SearchModal(Modal):
         )
         self.field.bind_submit(self.open_active)
         self.field.entry.installEventFilter(self)
-        self.body.addWidget(self.field)
+        search_row = QHBoxLayout()
+        search_row.setContentsMargins(0, 0, 0, 0)
+        search_row.setSpacing(8)
+        search_row.addWidget(self.field, 1)
+        self.close_button = Button(
+            "",
+            command=self.close_modal,
+            icon="x",
+            size="md",
+            width=theme.CONTROL_HEIGHT,
+        )
+        search_row.addWidget(self.close_button)
+        self.body.addLayout(search_row)
         # Результаты прокручиваются, если не помещаются в окно.
         self._scroll = ScrollArea(gutter=8)
         self._results = self._scroll.body

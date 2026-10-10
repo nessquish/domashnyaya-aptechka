@@ -156,11 +156,11 @@ class DataService:
         """
         path = Path(path)
         suffix = path.suffix.lower().lstrip(".")
-        if suffix not in ("csv", "json"):
-            raise ValidationError("Импорт возможен из файлов CSV и JSON")
+        if suffix not in ("csv", "xlsx"):
+            raise ValidationError("Импорт возможен из файлов CSV и Excel")
         try:
             records = (
-                self._read_json(path) if suffix == "json" else self._read_csv(path)
+                self._read_xlsx(path) if suffix == "xlsx" else self._read_csv(path)
             )
         except (OSError, ValueError) as error:
             raise ValidationError(f"Не удалось прочитать файл: {error}")
@@ -182,6 +182,32 @@ class DataService:
         if not isinstance(data, list) or not all(isinstance(x, dict) for x in data):
             raise ValueError("ожидается список товаров")
         return data
+
+    @staticmethod
+    def _read_xlsx(path: Path) -> List[Dict[str, object]]:
+        """Читает товары из файла Excel (первый лист)."""
+        from openpyxl import load_workbook
+
+        book = load_workbook(path, read_only=True, data_only=True)
+        sheet = book.active
+        rows = sheet.iter_rows(values_only=True)
+        try:
+            header = next(rows)
+        except StopIteration:
+            return []
+        titles = [
+            _BY_TITLE.get(str(cell).strip().casefold()) if cell is not None else None
+            for cell in header
+        ]
+        records = []
+        for raw in rows:
+            record = {}
+            for key, value in zip(titles, raw):
+                if key is not None and value is not None:
+                    record[key] = value
+            if record:
+                records.append(record)
+        return records
 
     @staticmethod
     def _read_csv(path: Path) -> List[Dict[str, object]]:

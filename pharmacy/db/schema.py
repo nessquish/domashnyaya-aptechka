@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     warning_days INTEGER NOT NULL DEFAULT 30
         CHECK (warning_days BETWEEN 1 AND 365),
-    theme TEXT NOT NULL DEFAULT 'light'
-        CHECK (theme IN ('light', 'dark')),
+    theme TEXT NOT NULL DEFAULT 'system'
+        CHECK (theme IN ('light', 'dark', 'system')),
     notify_expired INTEGER NOT NULL DEFAULT 1
         CHECK (notify_expired IN (0, 1)),
     notify_low_stock INTEGER NOT NULL DEFAULT 1

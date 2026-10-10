@@ -1,5 +1,7 @@
 """Запуск Qt: приложение, шрифты, русский язык стандартных окон и значок."""
 
+import os
+import subprocess
 import sys
 from typing import Optional
 
@@ -43,15 +45,35 @@ def _setup(app: QApplication) -> None:
             _translators.append(translator)
     fonts.register_fonts()
 
-
 def system_theme() -> str:
     """Тема операционной системы сейчас: ``light`` или ``dark``.
 
-    В Windows читается настройка системы, поэтому смена темы замечается без
-    перезапуска. На других системах берётся тема, найденная при запуске.
+    Определяется по-разному в зависимости от окружения:
+
+    * KDE Plasma — через ``kreadconfig5``/``kreadconfig6``;
+    * Windows — через реестр;
+    * остальные среды — через Qt ``QStyleHints``.
+
+    Если ничего не удалось определить — возвращается значение,
+    найденное при запуске.
     """
-    app = application()
-    if sys.platform == "win32" and app.platformName() != "offscreen":
+    # 1. KDE Plasma
+    if os.environ.get("XDG_CURRENT_DESKTOP", "").upper().startswith("KDE"):
+        for tool in ("kreadconfig6", "kreadconfig5"):
+            try:
+                result = subprocess.run(
+                    [tool, "--file", "kdeglobals",
+                     "--group", "General", "--key", "ColorScheme"],
+                    capture_output=True, text=True, timeout=2,
+                )
+                name = (result.stdout or "").strip()
+                if name:
+                    return "dark" if "dark" in name.lower() else "light"
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                continue
+
+    # 2. Windows
+    if sys.platform == "win32":
         try:
             import winreg
 
@@ -64,8 +86,21 @@ def system_theme() -> str:
             return "light" if light else "dark"
         except OSError:
             pass
-    return _system_theme
 
+    # 3. Qt (для GNOME и остальных сред)
+    try:
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QGuiApplication
+
+        scheme = QGuiApplication.styleHints().colorScheme()
+        if scheme == Qt.ColorScheme.Dark:
+            return "dark"
+        if scheme == Qt.ColorScheme.Light:
+            return "light"
+    except (AttributeError, RuntimeError):
+        pass
+
+    return _system_theme
 
 def render_app_icon(size: int) -> QPixmap:
     """Рисует значок программы: фиолетовый скруглённый квадрат с белым крестом."""

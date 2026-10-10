@@ -23,7 +23,7 @@ from pharmacy.ui.widgets.sidebar import Sidebar
 from pharmacy.services.container import Services
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import sections, theme
-from pharmacy.ui.preferences import MENU_ICONS
+from pharmacy.ui.preferences import GLOBAL_USER, MENU_ICONS
 from pharmacy.ui.search_index import PRODUCT, SECTION, SETTINGS, Target
 from pharmacy.ui.theme import CARD_SHADOW_PAD, palette
 
@@ -300,25 +300,16 @@ class MainShell(QWidget):
         ProductFormDialog(self.app, self.services, self.user.id, saved)
 
     def set_theme(self, name: str) -> None:
-        """Сохраняет тему в настройках пользователя и сразу применяет её.
+        """Сохраняет выбранную тему устройства и сразу применяет её.
 
-        Окно строится заново на том же разделе: цвета читаются при создании
-        виджетов.
+        Тема — настройка устройства (не аккаунта), поэтому хранится
+        в preferences под ``GLOBAL_USER``. Окно строится заново: цвета
+        читаются при создании виджетов.
         """
         if name == self.app.theme_mode(self.user):
             return
-        self.app.preferences.set(self.user.id, THEME_MODE, name)
-        resolved = self.app.resolve_theme(self.user)
-        user = self.user
-        if resolved != user.theme:
-            user = self.services.settings.update_settings(
-                user.id,
-                str(user.warning_days),
-                resolved,
-                user.notify_expired,
-                user.notify_low_stock,
-            )
-        self.app.apply_user_changes(user, start=self.section)
+        self.app.preferences.set(GLOBAL_USER, THEME_MODE, name)
+        self.app.apply_user_changes(self.user, start=self.section)
 
     def toggle_theme(self) -> None:
         """Переключает светлую и тёмную тему."""

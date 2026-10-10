@@ -73,11 +73,10 @@ FIELD_WIDTH = 56
 SCALE_MIN, SCALE_MAX = 80, 150
 PROGRAM_NAME = "Моя аптечка"
 
-EXPORT_FORMATS = (("csv", "CSV"), ("json", "JSON"), ("xlsx", "Excel"))
-IMPORT_FORMATS = (("csv", "CSV"), ("json", "JSON"))
+EXPORT_FORMATS = (("csv", "CSV"), ("xlsx", "Excel"))
+IMPORT_FORMATS = (("csv", "CSV"), ("xlsx", "Excel"))
 FILTERS = {
     "csv": "CSV (*.csv)",
-    "json": "JSON (*.json)",
     "xlsx": "Excel (*.xlsx)",
 }
 
@@ -545,7 +544,7 @@ class SettingsScreen(QWidget):
             self.window(),
             "Импорт данных",
             "",
-            "Файлы данных (*.csv *.json);;CSV (*.csv);;JSON (*.json)",
+            "Файлы данных (*.csv *.xlsx);;CSV (*.csv);;Excel (*.xlsx)",            
         )
         return path
 

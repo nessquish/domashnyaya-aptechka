@@ -193,14 +193,21 @@ class Button(QAbstractButton):
         icon_size = theme.scaled(self._spec.icon)
         content = text_width(self.text(), self._spec.font)
         if self._icon:
-            content += icon_size + ICON_GAP
+            content += icon_size
+            if self.text():
+                content += ICON_GAP
         left = body.left() + (body.width() - content) / 2
         if self._icon:
             glyph = icon_pixmap(self._icon, icon_size, ink)
+            if self.text():
+                icon_x = left
+                left += icon_size + ICON_GAP
+            else:
+                icon_x = body.center().x() - icon_size / 2
             painter.drawPixmap(
-                round(left), round(body.center().y() - icon_size / 2), glyph
+                round(icon_x), round(body.center().y() - icon_size / 2), glyph
             )
-            left += icon_size + ICON_GAP
+
         painter.setPen(qcolor(ink))
         painter.setFont(font(self._spec.font))
         text_box = QRectF(left, body.top(), body.right() - left, body.height())
