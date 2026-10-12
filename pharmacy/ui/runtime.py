@@ -45,6 +45,7 @@ def _setup(app: QApplication) -> None:
             _translators.append(translator)
     fonts.register_fonts()
 
+
 def system_theme() -> str:
     """Тема операционной системы сейчас: ``light`` или ``dark``.
 
@@ -62,9 +63,18 @@ def system_theme() -> str:
         for tool in ("kreadconfig6", "kreadconfig5"):
             try:
                 result = subprocess.run(
-                    [tool, "--file", "kdeglobals",
-                     "--group", "General", "--key", "ColorScheme"],
-                    capture_output=True, text=True, timeout=2,
+                    [
+                        tool,
+                        "--file",
+                        "kdeglobals",
+                        "--group",
+                        "General",
+                        "--key",
+                        "ColorScheme",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
                 )
                 name = (result.stdout or "").strip()
                 if name:
@@ -101,6 +111,7 @@ def system_theme() -> str:
         pass
 
     return _system_theme
+
 
 def render_app_icon(size: int) -> QPixmap:
     """Рисует значок программы: фиолетовый скруглённый квадрат с белым крестом."""

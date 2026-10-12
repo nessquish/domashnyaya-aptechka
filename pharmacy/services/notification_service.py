@@ -48,12 +48,15 @@ def _expiring_message(product: Product, today: Optional[date]) -> str:
     )
 
 
-def _low_stock_message(product: Product) -> str:
+def _low_stock_message(product: Product, threshold: float = 0) -> str:
     """Текст уведомления о низком остатке."""
+    if threshold > 0:
+        limit, word = threshold, "порог"
+    else:
+        limit, word = product.min_quantity, "минимум"
     return (
         f"{product.name} · осталось {format_quantity(product.quantity)}"
-        f" {product.unit} (минимум {format_quantity(product.min_quantity)}"
-        f" {product.unit})"
+        f" {product.unit} ({word} {format_quantity(limit)} {product.unit})"
     )
 
 
@@ -129,7 +132,9 @@ class NotificationService:
         options = self.options_for(user_id)
         desired: Dict[_Key, str] = {}
         for product in products if options.enabled else []:
-            statuses = product_statuses(product, user.warning_days, today)
+            statuses = product_statuses(
+                product, user.warning_days, today, options.low_threshold
+            )
             if ProductStatus.EXPIRED in statuses and user.notify_expired:
                 desired[(product.id, NotificationKind.EXPIRED)] = _expired_message(
                     product
@@ -138,12 +143,9 @@ class NotificationService:
                 desired[(product.id, NotificationKind.EXPIRING)] = _expiring_message(
                     product, today
                 )
-            low = ProductStatus.LOW_STOCK in statuses or (
-                options.low_threshold > 0 and product.quantity < options.low_threshold
-            )
-            if low and user.notify_low_stock:
+            if ProductStatus.LOW_STOCK in statuses and user.notify_low_stock:
                 desired[(product.id, NotificationKind.LOW_STOCK)] = _low_stock_message(
-                    product
+                    product, options.low_threshold
                 )
 
         existing = {

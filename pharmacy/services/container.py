@@ -49,6 +49,6 @@ def build_services(db: Database) -> Services:
         shopping=ShoppingService(db),
         history=HistoryService(db),
         settings=SettingsService(db, notifications),
-        dashboard=DashboardService(db),
+        dashboard=DashboardService(db, products),
         data=DataService(db, products),
     )

@@ -179,8 +179,11 @@ class HistoryRecord:
 class ShoppingSource:
     """Откуда позиция попала в список покупок."""
 
-    MANUAL = "manual"
-    NOTIFICATION = "notification"
+    MANUAL = "manual"  # введено в окне «Добавить вручную»
+    NOTIFICATION = "notification"  # из экрана «Уведомления»
+    KIT = "kit"  # из таблицы «Моя аптечка»
+    CARD = "card"  # из карточки товара
+    HOME = "home"  # с главной страницы
 
 
 @dataclass(frozen=True)

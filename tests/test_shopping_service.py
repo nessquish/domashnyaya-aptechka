@@ -96,11 +96,53 @@ class AddFromProductTest(ShoppingTestCase):
                 self.user_id, self.make_product(), quantity="0"
             )
 
-    def test_duplicate_open_item_is_rejected(self):
+    def test_adding_again_increases_the_quantity(self):
         product_id = self.make_product()
-        self.service.add_from_product(self.user_id, product_id)
-        with self.assertRaises(ValidationError):
-            self.service.add_from_product(self.user_id, product_id)
+        first = self.service.add_from_product(
+            self.user_id, product_id, source=ShoppingSource.KIT
+        )
+        again = self.service.add_from_product(
+            self.user_id, product_id, source=ShoppingSource.KIT
+        )
+        self.assertEqual(self.count_rows("shopping_list"), 1)
+        self.assertEqual((first.quantity, again.quantity), (1, 2))
+        third = self.service.add_from_product(self.user_id, product_id, "3")
+        self.assertEqual(third.quantity, 5)
+
+    def test_quantity_does_not_depend_on_the_stock_in_the_kit(self):
+        product_id = self.make_product(quantity=1, min_quantity=50)
+        item = self.service.add_from_product(
+            self.user_id, product_id, source=ShoppingSource.KIT
+        )
+        self.assertEqual(item.quantity, 1)
+
+    def test_source_follows_the_place_of_adding(self):
+        for source in (
+            ShoppingSource.KIT,
+            ShoppingSource.CARD,
+            ShoppingSource.HOME,
+            ShoppingSource.NOTIFICATION,
+        ):
+            product_id = self.make_product()
+            item = self.service.add_from_product(
+                self.user_id, product_id, source=source
+            )
+            self.assertEqual(item.source, source)
+
+    def test_bulk_add_counts_new_and_increased(self):
+        first, second = self.make_product(), self.make_product()
+        self.service.add_from_product(self.user_id, first, source=ShoppingSource.KIT)
+        created, increased = self.service.add_products(self.user_id, [first, second])
+        self.assertEqual((created, increased), (1, 1))
+        self.assertEqual(self.count_rows("shopping_list"), 2)
+
+    def test_manual_add_of_a_known_product_increases_it(self):
+        product_id = self.make_product()
+        self.service.add_from_product(self.user_id, product_id, source="kit")
+        item = self.service.add_manual(
+            self.user_id, "Ибупрофен", "2", "упак.", product_id
+        )
+        self.assertEqual(item.quantity, 3)
         self.assertEqual(self.count_rows("shopping_list"), 1)
 
     def test_can_add_again_after_purchase(self):

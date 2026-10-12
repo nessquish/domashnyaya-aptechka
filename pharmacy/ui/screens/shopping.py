@@ -26,6 +26,7 @@ from pharmacy.ui.paging import fitted_rows, remembered_rows
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
 from pharmacy.utils.dates import format_user_date
 from pharmacy.utils.formatting import format_quantity
+from pharmacy.utils.textmatch import name_matches
 from pharmacy.utils.units import DEFAULT_UNIT, UNITS
 
 if TYPE_CHECKING:
@@ -35,6 +36,9 @@ FILTERS = (None, False, True)  # все, не куплено, куплено
 SOURCE_LABELS = {
     ShoppingSource.NOTIFICATION: "Уведомление",
     ShoppingSource.MANUAL: "Вручную",
+    ShoppingSource.KIT: "Моя аптечка",
+    ShoppingSource.CARD: "Карточка товара",
+    ShoppingSource.HOME: "Главная",
 }
 COLUMNS = (
     Column("", fixed=44),
@@ -385,11 +389,10 @@ class ProductSearchField(ComboField):
         return None
 
     def _matches(self, text: str) -> List[Tuple[object, str]]:
-        needle = text.strip().casefold()
         return [
             (number, caption)
             for number, name, caption in self._products
-            if needle and needle in name.casefold()
+            if name_matches(name, text)
         ]
 
     def toggle_list(self) -> None:

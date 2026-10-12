@@ -1,6 +1,7 @@
 """Экран «Моя аптечка» (макет Figma, экраны 04 и 15): таблица товаров."""
 
 import math
+from datetime import date
 from typing import TYPE_CHECKING, List, Optional, Set
 
 from PySide6.QtCore import QTimer, Qt
@@ -21,6 +22,7 @@ from pharmacy.ui.widgets.select import Select
 from pharmacy.ui.widgets.sortselect import SortSelect
 from pharmacy.ui.widgets.table import Column, DataTable, TextCell
 from pharmacy.ui.widgets.wrap import TwoSideLayout
+from pharmacy.models import ShoppingSource
 from pharmacy.services.product_service import ProductView
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import labels, sorting
@@ -38,14 +40,23 @@ FLASH_MS = 4000  # сколько держится подсветка найде
 SEARCH_DELAY_MS = 250
 SORT_PREFERENCE = "kit_sort"  # выбранная сортировка запоминается для пользователя
 COLUMNS = (
-    Column("Название", 30),
-    Column("Категория", 20),
-    Column("Количество", 14),
-    Column("Ед. изм.", 11),
-    Column("Срок годности", 17),
-    Column("Место хранения", 17),
-    Column("Состояние", 18),
+    Column("Название", 24),
+    Column("Дата добавления", 15),
+    Column("Категория", 16),
+    Column("Количество", 12),
+    Column("Ед. изм.", 9),
+    Column("Срок годности", 14),
+    Column("Место хранения", 14),
+    Column("Состояние", 16),
 )
+
+
+def _added(product) -> str:
+    """Дата добавления товара в формате ДД.ММ.ГГГГ."""
+    try:
+        return format_user_date(date.fromisoformat(product.created_at[:10]))
+    except ValueError:
+        return "—"
 
 
 class MyKitScreen(QWidget):
@@ -430,13 +441,15 @@ class MyKitScreen(QWidget):
         self._table.set_rounded_top(False)
 
     def _add_to_shopping(self) -> None:
-        added, skipped = self._services.shopping.add_products(
-            self._user.id, sorted(self._selected)
+        created, increased = self._services.shopping.add_products(
+            self._user.id, sorted(self._selected), ShoppingSource.KIT
         )
-        text = f"Добавлено в список покупок: {added}"
-        if skipped:
-            text += f" (уже в списке: {skipped})"
-        self._finish(text)
+        parts = []
+        if created:
+            parts.append(f"добавлено в список покупок: {created}")
+        if increased:
+            parts.append(f"увеличено количество: {increased}")
+        self._finish((", ".join(parts) or "Ничего не добавлено").capitalize())
 
     def _confirm_delete(self) -> None:
         Dialog(
@@ -469,20 +482,32 @@ class MyKitScreen(QWidget):
 
     def _show_sort(self) -> None:
         """Подпись сортировки (фиолетовая) только рядом с выбранным столбцом."""
+        self._update_quantity_range()
         kind = sorting.kind_of(self._sort)
-        choice = sorting.choice_of(self._sort)
-        self._table.set_sort_caption(kind.column, choice.caption)
+        self._table.set_sort_caption(kind.column, sorting.caption_of(self._sort))
         for other in sorting.SORT_KINDS:
             if other.column is None:
                 continue
             if other is kind:
                 tip = (
-                    f"Сортировка: {choice.label}. Нажмите, чтобы поменять: "
-                    f"{sorting.choice_of(sorting.toggled(self._sort)).label}"
+                    f"Сортировка: {sorting.label_of(self._sort)}. "
+                    "Нажмите, чтобы поменять: "
+                    f"{sorting.label_of(sorting.toggled(self._sort))}"
                 )
             else:
                 tip = f"Нажмите, чтобы отсортировать {other.label.lower()}"
             self._table.set_header_tip(other.column, tip)
+
+    def _update_quantity_range(self) -> None:
+        """Берёт наименьшее и наибольшее количество из всей аптечки для подписей."""
+        quantities = [
+            view.product.quantity
+            for view in self._services.products.list_products(self._user.id)
+        ]
+        if quantities:
+            sorting.set_quantity_range(min(quantities), max(quantities))
+        else:
+            sorting.set_quantity_range(None, None)
 
     @property
     def table(self) -> DataTable:
@@ -504,6 +529,7 @@ class MyKitScreen(QWidget):
                 bold=True,
                 on_click=lambda p=product.id: self._shell.open_product(p),
             ),
+            TextCell(_added(product), "ink_2"),
             TextCell(labels.short_category(product.category_name), "ink_2"),
             TextCell(format_quantity(product.quantity), "ink_2"),
             TextCell(product.unit, "ink_2"),

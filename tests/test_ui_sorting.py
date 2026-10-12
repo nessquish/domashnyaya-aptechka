@@ -56,9 +56,9 @@ class SortingDataTest(unittest.TestCase):
 
     def test_columns_map_to_kinds(self):
         self.assertEqual(sorting.kind_for_column(0).key, "name")
-        self.assertEqual(sorting.kind_for_column(2).key, "quantity")
-        self.assertEqual(sorting.kind_for_column(6).key, "status")
-        self.assertIsNone(sorting.kind_for_column(3))  # «Ед. изм.» не сортируется
+        self.assertEqual(sorting.kind_for_column(3).key, "quantity")
+        self.assertEqual(sorting.kind_for_column(7).key, "status")
+        self.assertIsNone(sorting.kind_for_column(4))  # «Ед. изм.» не сортируется
         self.assertIsNone(sorting.kind_by_key("added").column)
 
     def test_field_text(self):
@@ -109,7 +109,7 @@ class DefaultSortTest(SortTestCase):
         self.assertEqual(self.kit.sort, "status")
         self.assertEqual(self.names()[0], "Активированный уголь")
         order = ["Просрочен", "Скоро истекает", "Низкий остаток", "Норма"]
-        ranks = [order.index(s) for s in self.column(6)]
+        ranks = [order.index(s) for s in self.column(7)]
         self.assertEqual(ranks, sorted(ranks))
 
     def test_the_field_shows_the_current_sort(self):
@@ -119,11 +119,11 @@ class DefaultSortTest(SortTestCase):
 
     def test_caption_is_next_to_the_state_column_only(self):
         table = self.kit.table
-        self.assertEqual(table.caption_column, 6)
+        self.assertEqual(table.caption_column, 7)
         self.assertEqual(table.caption, "просроч.")
 
     def test_expiry_header_has_no_arrow_or_caption_any_more(self):
-        texts = [w.text() for w in self.kit.table._header_cells[5].findChildren(QLabel)]
+        texts = [w.text() for w in self.kit.table._header_cells[6].findChildren(QLabel)]
         self.assertEqual(texts, ["Срок годности"])
 
 
@@ -157,7 +157,10 @@ class TwoStepListTest(SortTestCase):
         popup = self.open_list()
         self.pick_in_list(popup, "quantity")
         labels = [label for _value, label in popup.options][1:]
-        self.assertEqual(labels, ["от большего к меньшему", "от меньшего к большему"])
+        self.assertEqual(
+            labels,
+            ["от большего к меньшему (10-1)", "от меньшего к большему (1-10)"],
+        )
 
     def test_no_extra_window_is_created(self):
         before = {id(w) for w in self.app.findChildren(QWidget) if w.isWindow()}
@@ -233,15 +236,15 @@ class EverySortTest(SortTestCase):
 
     def test_quantity_both_ways(self):
         self.choose("quantity", "quantity_desc")
-        amounts = [float(v) for v in self.column(2)]
+        amounts = [float(v) for v in self.column(3)]
         self.assertEqual(amounts, sorted(amounts, reverse=True))
         self.choose("quantity", "quantity")
-        amounts = [float(v) for v in self.column(2)]
+        amounts = [float(v) for v in self.column(3)]
         self.assertEqual(amounts, sorted(amounts))
 
     def test_expiry_both_ways_with_empty_dates_last(self):
         def dates():
-            return [d for d in self.column(4)]
+            return [d for d in self.column(5)]
 
         def key(text):
             return tuple(reversed(text.split(".")))
@@ -259,18 +262,18 @@ class EverySortTest(SortTestCase):
 
     def test_category_both_ways(self):
         self.choose("category", "category")
-        names = self.column(1)
+        names = self.column(2)
         self.assertEqual(names, sorted(names, key=str.casefold))
         self.choose("category", "category_desc")
-        names = self.column(1)
+        names = self.column(2)
         self.assertEqual(names, sorted(names, key=str.casefold, reverse=True))
 
     def test_place_both_ways(self):
         self.choose("place", "place")
-        places = [p for p in self.column(5) if p != "—"]
+        places = [p for p in self.column(6) if p != "—"]
         self.assertEqual(places, sorted(places, key=str.casefold))
         self.choose("place", "place_desc")
-        places = [p for p in self.column(5) if p != "—"]
+        places = [p for p in self.column(6) if p != "—"]
         self.assertEqual(places, sorted(places, key=str.casefold, reverse=True))
 
     def test_added_both_ways(self):
@@ -287,15 +290,15 @@ class EverySortTest(SortTestCase):
     def test_state_both_ways(self):
         self.choose("status", "status_ok")
         order = ["Норма", "Низкий остаток", "Скоро истекает", "Просрочен"]
-        ranks = [order.index(s) for s in self.column(6)]
+        ranks = [order.index(s) for s in self.column(7)]
         self.assertEqual(ranks, sorted(ranks))
         self.choose("status", "status")
-        self.assertEqual(self.column(6)[0], "Просрочен")
+        self.assertEqual(self.column(7)[0], "Просрочен")
 
     def test_field_text_follows_the_choice(self):
         self.choose("quantity", "quantity_desc")
         self.assertEqual(
-            self.kit.sort_select.shown_text(), "Сортировка: количество (9-0)"
+            self.kit.sort_select.shown_text(), "Сортировка: количество (10-1)"
         )
 
     def test_page_resets_to_the_first(self):
@@ -320,13 +323,13 @@ class HeaderCaptionTest(SortTestCase):
         cases = {
             ("name", "name"): (0, "А-Я"),
             ("name", "name_desc"): (0, "Я-А"),
-            ("quantity", "quantity_desc"): (2, "9-0"),
-            ("quantity", "quantity"): (2, "0-9"),
-            ("expiry", "expiry"): (4, "ближе"),
-            ("expiry", "expiry_desc"): (4, "дальше"),
-            ("category", "category"): (1, "А-Я"),
-            ("place", "place_desc"): (5, "Я-А"),
-            ("status", "status_ok"): (6, "норма"),
+            ("quantity", "quantity_desc"): (3, "10-1"),
+            ("quantity", "quantity"): (3, "1-10"),
+            ("expiry", "expiry"): (5, "ближе"),
+            ("expiry", "expiry_desc"): (5, "дальше"),
+            ("category", "category"): (2, "А-Я"),
+            ("place", "place_desc"): (6, "Я-А"),
+            ("status", "status_ok"): (7, "норма"),
         }
         for (kind, value), (column, caption) in cases.items():
             self.choose(kind, value)
@@ -343,16 +346,16 @@ class HeaderCaptionTest(SortTestCase):
             theme.LIGHT.primary.upper(),
         )
 
-    def test_added_sort_has_no_column_so_no_caption(self):
+    def test_added_sort_has_its_own_column(self):
         self.choose("added", "added")
-        self.assertIsNone(self.kit.table.caption_column)
-        self.assertEqual(self.caption_columns(), [])
+        self.assertEqual(self.kit.table.caption_column, 1)
+        self.assertEqual(self.caption_columns(), [1])
 
     def test_caption_moves_when_the_sort_changes(self):
         self.choose("name", "name")
         self.assertEqual(self.caption_columns(), [0])
         self.choose("quantity", "quantity")
-        self.assertEqual(self.caption_columns(), [2])
+        self.assertEqual(self.caption_columns(), [3])
 
 
 class HeaderClickTest(SortTestCase):
@@ -370,26 +373,26 @@ class HeaderClickTest(SortTestCase):
         self.assertEqual(self.kit.sort, "name")
 
     def test_click_on_another_column_sorts_by_it_from_the_first_direction(self):
-        click(self.head(2))
+        click(self.head(3))
         self.settle()
         self.assertEqual(self.kit.sort, "quantity_desc")
         self.assertEqual(self.kit.sort_select.get(), "quantity_desc")
-        self.assertEqual(self.kit.table.caption_column, 2)
+        self.assertEqual(self.kit.table.caption_column, 3)
 
     def test_state_header_flips_between_the_two_orders(self):
-        click(self.head(6))
+        click(self.head(7))
         self.settle()
         self.assertEqual(self.kit.sort, "status_ok")
-        self.assertEqual(self.column(6)[0], "Норма")
+        self.assertEqual(self.column(7)[0], "Норма")
 
     def column(self, index):
         return [row[index] for row in self.kit.table.row_texts]
 
     def test_unit_column_is_not_sortable(self):
         self.assertNotEqual(
-            self.head(3).cursor().shape(), self.head(2).cursor().shape()
+            self.head(4).cursor().shape(), self.head(3).cursor().shape()
         )
-        click(self.head(3))
+        click(self.head(4))
         self.settle()
         self.assertEqual(self.kit.sort, "status")
 
@@ -397,7 +400,7 @@ class HeaderClickTest(SortTestCase):
         self.choose("name", "name")
         self.assertIn("от А до Я", self.head(0).toolTip())
         self.assertIn("от Я до А", self.head(0).toolTip())
-        self.assertIn("количеству", self.head(2).toolTip())
+        self.assertIn("количеству", self.head(3).toolTip())
 
 
 class PersistenceTest(SortTestCase):

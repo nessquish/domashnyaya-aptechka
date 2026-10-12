@@ -43,7 +43,7 @@ class MyKitTest(KitTestCase):
 
     def test_row_has_a_cell_for_every_column(self):
         for row in self.kit.table.row_texts:
-            self.assertEqual(len(row), 7)
+            self.assertEqual(len(row), 8)
 
     def test_search_ignores_case(self):
         self.kit._search_field.set("ИБУ")
@@ -72,7 +72,7 @@ class MyKitTest(KitTestCase):
         shown = self.kit.table.row_texts
         self.assertTrue(shown)
         for row in shown:
-            self.assertEqual(row[1], "Лекарства")
+            self.assertEqual(row[2], "Лекарства")
 
     def test_status_filter(self):
         self.kit._on_status(ProductStatus.EXPIRED)
@@ -339,8 +339,22 @@ class ProductCardTest(KitTestCase):
         )
         cards = find_all(self.app, ProductCardDialog)
         self.assertEqual(len(cards), 1)  # карточка открыта заново, уже с отметкой
-        self.assertFalse(cards[0].list_button.enabled)
-        self.assertEqual(cards[0].list_button.text(), "В списке покупок")
+        self.assertTrue(cards[0].list_button.enabled)
+        self.assertEqual(cards[0].list_button.text(), "Добавить ещё в список")
+        item = next(
+            i
+            for i in self.services.shopping.list_items(self.app.user.id)
+            if i.name == "Витамин D"
+        )
+        self.assertEqual((item.source, item.quantity), ("card", 1))
+        cards[0].list_button.invoke()  # ещё раз: количество растёт
+        self.settle()
+        again = [
+            i
+            for i in self.services.shopping.list_items(self.app.user.id)
+            if i.name == "Витамин D"
+        ]
+        self.assertEqual([i.quantity for i in again], [2])
 
     def test_edit_button_opens_the_edit_window(self):
         card = self.open_card()

@@ -12,6 +12,9 @@ DEFAULT_CATEGORIES = (
     "Средства гигиены",
 )
 
+# Нужен для переноса старых баз: ограничение источника пришлось расширить.
+SHOPPING_SOURCES = ("manual", "notification", "kit", "card", "home")
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,7 +79,7 @@ CREATE TABLE IF NOT EXISTS shopping_list (
     quantity REAL NOT NULL DEFAULT 1 CHECK (quantity > 0),
     unit TEXT NOT NULL DEFAULT 'шт.',
     source TEXT NOT NULL DEFAULT 'manual'
-        CHECK (source IN ('manual', 'notification')),
+        CHECK (source IN ('manual', 'notification', 'kit', 'card', 'home')),
     is_bought INTEGER NOT NULL DEFAULT 0 CHECK (is_bought IN (0, 1)),
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );

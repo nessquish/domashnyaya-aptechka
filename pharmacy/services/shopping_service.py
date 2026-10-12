@@ -70,65 +70,106 @@ class ShoppingService:
         unit = normalize_unit(unit)
         if product_id is not None and self._products.get(user_id, product_id) is None:
             raise NotFoundError("Товар не найден")
+        if product_id is not None:
+            existing = self._items.find_open_for_product(user_id, product_id)
+            if existing is not None:
+                return self._increase(user_id, existing, amount)
         return self._add(user_id, name, amount, unit, ShoppingSource.MANUAL, product_id)
 
     def add_from_product(
-        self, user_id: int, product_id: int, quantity: Optional[str] = None
+        self,
+        user_id: int,
+        product_id: int,
+        quantity: Optional[str] = None,
+        source: str = ShoppingSource.NOTIFICATION,
     ) -> ShoppingItem:
-        """Добавляет в список покупок товар из аптечки (из уведомления или карточки).
+        """Добавляет в список покупок товар из аптечки.
 
-        Если количество не указано, предлагается докупить до двойного
-        минимального остатка, но не меньше одной единицы.
+        Количество в списке покупок свой, не связан с остатком в аптечке.
+        Если количество не указано, добавляется одна единица (из уведомления
+        предлагается докупить до двойного минимального остатка, но не меньше
+        одной). Если товар уже есть в списке и не куплен, его количество
+        увеличивается на столько же, а не создаётся вторая позиция.
 
         Args:
             user_id: Владелец списка.
             product_id: Товар аптечки.
-            quantity: Количество текстом (необязательно).
+            quantity: Сколько добавить, текстом (необязательно).
+            source: Откуда добавлено (см. models.ShoppingSource).
 
         Returns:
-            Добавленная позиция.
+            Позиция списка покупок (новая или с увеличенным количеством).
 
         Raises:
             NotFoundError: Если товара нет или он чужой.
-            ValidationError: Если товар уже в списке или количество неверно.
+            ValidationError: Если количество неверно.
         """
         product = self._products.get(user_id, product_id)
         if product is None:
             raise NotFoundError("Товар не найден")
-        if self._items.find_open_for_product(user_id, product_id) is not None:
-            raise ValidationError(f"«{product.name}» уже в списке покупок")
         if quantity:
             amount = _parse_amount(quantity, "quantity", None)
             if amount <= 0:
                 raise ValidationError("Количество должно быть больше нуля", "quantity")
-        else:
+        elif source == ShoppingSource.NOTIFICATION:
             amount = max(product.min_quantity * 2 - product.quantity, 1)
+        else:
+            amount = 1.0
+        existing = self._items.find_open_for_product(user_id, product_id)
+        if existing is not None:
+            return self._increase(user_id, existing, amount)
         return self._add(
             user_id,
             product.name,
             amount,
             product.unit or DEFAULT_UNIT,
-            ShoppingSource.NOTIFICATION,
+            source,
             product.id,
         )
 
-    def add_products(self, user_id: int, product_ids: Sequence[int]) -> Tuple[int, int]:
+    def add_products(
+        self,
+        user_id: int,
+        product_ids: Sequence[int],
+        source: str = ShoppingSource.KIT,
+    ) -> Tuple[int, int]:
         """Добавляет в список покупок несколько товаров аптечки.
 
-        Товары, которые уже в списке (не куплены), и недоступные пропускаются.
+        Каждый товар добавляется на одну единицу; если он уже в списке, его
+        количество увеличивается. Недоступные товары пропускаются.
 
         Returns:
-            Пара: сколько добавлено и сколько пропущено.
+            Пара: сколько позиций создано и у скольких увеличено количество.
         """
-        added = skipped = 0
+        created = increased = 0
         for product_id in product_ids:
+            was_in_list = self.is_in_list(user_id, product_id)
             try:
-                self.add_from_product(user_id, product_id)
+                self.add_from_product(user_id, product_id, source=source)
             except (NotFoundError, ValidationError):
-                skipped += 1
                 continue
-            added += 1
-        return added, skipped
+            if was_in_list:
+                increased += 1
+            else:
+                created += 1
+        return created, increased
+
+    def _increase(
+        self, user_id: int, item: ShoppingItem, amount: float
+    ) -> ShoppingItem:
+        """Увеличивает количество у позиции, которая уже есть в списке."""
+        total = item.quantity + amount
+        with self._db.transaction() as conn:
+            self._items.update_quantity(user_id, item.id, total, conn)
+            self._history.add(
+                user_id,
+                item.product_id,
+                HistoryAction.SHOPPING_ADDED,
+                f"{item.name} · +{format_quantity(amount)} {item.unit} · "
+                f"в списке покупок теперь {format_quantity(total)} {item.unit}",
+                conn,
+            )
+        return self._require(user_id, item.id)
 
     def is_in_list(self, user_id: int, product_id: int) -> bool:
         """Проверяет, есть ли товар в списке покупок среди не купленных."""

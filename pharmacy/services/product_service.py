@@ -20,6 +20,7 @@ from pharmacy.services.status import (
     product_statuses,
 )
 from pharmacy.utils.dates import days_until, parse_user_date
+from pharmacy.utils.textmatch import name_matches
 from pharmacy.utils.formatting import format_quantity
 from pharmacy.utils.units import normalize_unit
 
@@ -393,11 +394,10 @@ class ProductService:
             name = product.name.casefold()
             if name.startswith(needle):
                 rank = 0
-            elif needle in name:
+            elif name_matches(product.name, query):
                 rank = 1
-            elif (
-                needle in (product.category_name or "").casefold()
-                or needle in (product.note or "").casefold()
+            elif name_matches(product.category_name or "", query) or name_matches(
+                product.note or "", query
             ):
                 rank = 2
             else:
@@ -423,7 +423,9 @@ class ProductService:
             NotFoundError: Если товара нет или он принадлежит другому пользователю.
         """
         product = self._require_product(user_id, product_id)
-        return self._view(product, self._warning_days(user_id), today)
+        return self._view(
+            product, self._warning_days(user_id), today, self._low_threshold(user_id)
+        )
 
     def list_products(
         self,
@@ -451,12 +453,14 @@ class ProductService:
             Список товаров с состояниями.
         """
         warning_days = self._warning_days(user_id)
+        threshold = self._low_threshold(user_id)
         by_status = sort in (SORT_STATUS, SORT_STATUS_OK)
         views = [
-            self._view(product, warning_days, today)
+            self._view(product, warning_days, today, threshold)
             for product in self._products.list_for_user(
-                user_id, search, category_id, "expiry" if by_status else sort
+                user_id, "", category_id, "expiry" if by_status else sort
             )
+            if not search.strip() or name_matches(product.name, search)
         ]
         if status is not None:
             views = [view for view in views if status in view.statuses]
@@ -465,7 +469,11 @@ class ProductService:
         return views
 
     def _view(
-        self, product: Product, warning_days: int, today: Optional[date]
+        self,
+        product: Product,
+        warning_days: int,
+        today: Optional[date],
+        low_threshold: float = 0,
     ) -> ProductView:
         """Собирает ProductView: товар, его состояния и дни до конца срока."""
         days_left = None
@@ -473,9 +481,15 @@ class ProductService:
             days_left = days_until(product.expiry_date, today)
         return ProductView(
             product=product,
-            statuses=product_statuses(product, warning_days, today),
+            statuses=product_statuses(product, warning_days, today, low_threshold),
             days_left=days_left,
         )
+
+    def _low_threshold(self, user_id: int) -> float:
+        """Порог низкого остатка из настроек уведомлений (0: по минимуму товара)."""
+        if self._notifications is None:
+            return 0.0
+        return self._notifications.options_for(user_id).low_threshold
 
     def _warning_days(self, user_id: int) -> int:
         """Возвращает настройку «за сколько дней предупреждать» пользователя."""

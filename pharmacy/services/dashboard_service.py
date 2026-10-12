@@ -59,13 +59,14 @@ def _attention_key(view: ProductView):
 class DashboardService:
     """Собирает сводку из товаров, истории, уведомлений и списка покупок."""
 
-    def __init__(self, db: Database) -> None:
+    def __init__(self, db: Database, products: Optional[ProductService] = None) -> None:
         """Создаёт сервис.
 
         Args:
             db: Менеджер базы данных.
+            products: Сервис товаров (общий, чтобы учитывать порог низкого остатка).
         """
-        self._products = ProductService(db)
+        self._products = products or ProductService(db)
         self._history = HistoryRepository(db)
         self._notifications = NotificationRepository(db)
         self._shopping = ShoppingRepository(db)

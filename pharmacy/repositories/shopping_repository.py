@@ -58,6 +58,20 @@ class ShoppingRepository(BaseRepository):
             )
             return cursor.lastrowid
 
+    def update_quantity(
+        self,
+        user_id: int,
+        item_id: int,
+        quantity: float,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> None:
+        """Меняет, сколько нужно купить."""
+        with self._connection(conn) as c:
+            c.execute(
+                "UPDATE shopping_list SET quantity = ? WHERE id = ? AND user_id = ?",
+                (quantity, item_id, user_id),
+            )
+
     def get(self, user_id: int, item_id: int) -> Optional[ShoppingItem]:
         """Находит позицию пользователя (None, если нет или она чужая)."""
         row = self.db.fetch_one(

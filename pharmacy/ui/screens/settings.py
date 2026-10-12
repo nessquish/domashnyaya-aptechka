@@ -544,7 +544,7 @@ class SettingsScreen(QWidget):
             self.window(),
             "Импорт данных",
             "",
-            "Файлы данных (*.csv *.xlsx);;CSV (*.csv);;Excel (*.xlsx)",            
+            "Файлы данных (*.csv *.xlsx);;CSV (*.csv);;Excel (*.xlsx)",
         )
         return path
 

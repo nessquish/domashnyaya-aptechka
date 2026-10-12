@@ -208,7 +208,7 @@ class App(QMainWindow):
             expiring=bool(prefs.get(user_id, "notify_expiring", True)),
             low_threshold=float(prefs.get(user_id, "low_threshold", 0) or 0),
         )
-        
+
     def theme_mode(self, user: User) -> str:
         """Тема оформления — настройка устройства, общая для всех аккаунтов.
 
@@ -280,6 +280,7 @@ class App(QMainWindow):
             max((screen_width - self.width()) // 2, 0),
             max((screen_height - self.height()) // 2, 0),
         )
+
 
 def prepare_demo(db: Database) -> None:
     """В демо-сборке при первом запуске создаёт тестовый аккаунт со всеми данными."""

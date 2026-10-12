@@ -10,6 +10,7 @@ from pharmacy.ui.sorting import (
     field_text,
     kind_by_key,
     kind_of,
+    label_of,
 )
 from pharmacy.ui.widgets.popup import Option, PopupList, Stage
 from pharmacy.ui.widgets.select import Select
@@ -79,7 +80,7 @@ class SortSelect(Select):
         """Выбран вид: список меняется на подвиды этого вида."""
         kind: SortKind = kind_by_key(str(key))
         options: List[Option] = [(BACK, BACK_LABEL)]
-        options += [(choice.value, choice.label) for choice in kind.choices]
+        options += [(choice.value, label_of(choice.value)) for choice in kind.choices]
         selected = self._value if kind_of(self._value) is kind else None
         return options, selected, self._pick, self._from_choices
 

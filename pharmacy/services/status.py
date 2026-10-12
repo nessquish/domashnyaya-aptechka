@@ -46,6 +46,7 @@ def get_statuses(
     min_quantity: float,
     warning_days: int,
     today: Optional[date] = None,
+    low_threshold: float = 0,
 ) -> List[ProductStatus]:
     """Определяет все состояния товара.
 
@@ -53,7 +54,9 @@ def get_statuses(
       * срок вышел, если дата раньше сегодняшней;
       * срок скоро выйдет, если до даты осталось не больше ``warning_days`` дней
         (включая сегодняшний день);
-      * остаток низкий, если количество не больше минимального.
+      * остаток низкий, если количество не больше минимального остатка товара,
+        а если в настройках уведомлений задан порог низкого остатка, то если
+        количество не больше этого порога (от 0 до порога включительно).
 
     Args:
         expiry_date: Срок годности или None.
@@ -61,6 +64,7 @@ def get_statuses(
         min_quantity: Минимальный остаток.
         warning_days: За сколько дней предупреждать о сроке.
         today: Сегодняшняя дата (по умолчанию берётся из системы).
+        low_threshold: Порог низкого остатка из настроек (0: по минимуму товара).
 
     Returns:
         Список состояний от самого важного. Если проблем нет, в нём
@@ -73,13 +77,17 @@ def get_statuses(
             statuses.append(ProductStatus.EXPIRED)
         elif expiry_date <= today + timedelta(days=warning_days):
             statuses.append(ProductStatus.EXPIRING)
-    if quantity <= min_quantity:
+    limit = low_threshold if low_threshold > 0 else min_quantity
+    if quantity <= limit:
         statuses.append(ProductStatus.LOW_STOCK)
     return statuses or [ProductStatus.OK]
 
 
 def product_statuses(
-    product: Product, warning_days: int, today: Optional[date] = None
+    product: Product,
+    warning_days: int,
+    today: Optional[date] = None,
+    low_threshold: float = 0,
 ) -> List[ProductStatus]:
     """Определяет состояния товара из объекта Product (см. get_statuses)."""
     return get_statuses(
@@ -88,6 +96,7 @@ def product_statuses(
         product.min_quantity,
         warning_days,
         today,
+        low_threshold,
     )
 
 

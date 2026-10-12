@@ -13,6 +13,7 @@ from pharmacy.ui.widgets.common import Line, clickable, label, pad
 from pharmacy.ui.widgets.iconbox import IconBox
 from pharmacy.ui.widgets.link import Link
 from pharmacy.ui.widgets.page import PageHeader
+from pharmacy.models import ShoppingSource
 from pharmacy.services.dashboard_service import DashboardSummary
 from pharmacy.services.product_service import ProductView
 from pharmacy.services.status import ProductStatus
@@ -291,5 +292,7 @@ class DashboardScreen(QWidget):
 
     def _add_to_list(self, product_id: int) -> None:
         """Добавляет товар в список покупок и обновляет экран."""
-        self._services.shopping.add_from_product(self._user.id, product_id)
+        self._services.shopping.add_from_product(
+            self._user.id, product_id, source=ShoppingSource.HOME
+        )
         self._shell.navigate(sections.HOME)

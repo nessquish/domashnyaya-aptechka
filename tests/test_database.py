@@ -53,7 +53,7 @@ class SchemaTest(DatabaseTestCase):
         user_id = self.add_user()
         row = self.db.fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
         self.assertEqual(row["warning_days"], 30)
-        self.assertEqual(row["theme"], "light")
+        self.assertEqual(row["theme"], "system")
         self.assertEqual(row["notify_expired"], 1)
         self.assertEqual(row["notify_low_stock"], 1)
         self.assertTrue(row["created_at"])
@@ -202,3 +202,34 @@ class CasefoldTest(DatabaseTestCase):
         )
         self.assertEqual(len(plain_like), 0)
         self.assertEqual(len(with_casefold), 1)
+
+
+class ShoppingMigrationTest(DatabaseTestCase):
+    def test_old_shopping_table_is_rebuilt_with_data(self):
+        with self.db.transaction() as conn:
+            conn.execute("DROP TABLE shopping_list")
+            conn.execute(
+                "CREATE TABLE shopping_list (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                " user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,"
+                " product_id INTEGER REFERENCES products (id) ON DELETE SET NULL,"
+                " name TEXT NOT NULL, quantity REAL NOT NULL DEFAULT 1,"
+                " unit TEXT NOT NULL DEFAULT 'шт.',"
+                " source TEXT NOT NULL DEFAULT 'manual'"
+                " CHECK (source IN ('manual', 'notification')),"
+                " is_bought INTEGER NOT NULL DEFAULT 0,"
+                " created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')))"
+            )
+        user_id = self.add_user("anna")
+        self.db.execute(
+            "INSERT INTO shopping_list (user_id, name, source)"
+            " VALUES (?, 'Вата', 'manual')",
+            (user_id,),
+        )
+        self.db.init_schema()
+        self.assertEqual(self.count_rows("shopping_list"), 1)
+        self.db.execute(
+            "INSERT INTO shopping_list (user_id, name, source)"
+            " VALUES (?, 'Бинт', 'kit')",
+            (user_id,),
+        )
+        self.assertEqual(self.count_rows("shopping_list"), 2)

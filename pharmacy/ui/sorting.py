@@ -9,6 +9,8 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pharmacy.utils.formatting import format_quantity
+
 DEFAULT_SORT = "status"  # если сортировка не выбрана: по состоянию, это важнее всего
 
 
@@ -36,7 +38,7 @@ class SortKind:
         label: Подпись в списке видов.
         short: Название вида в поле выбора («название»).
         column: Номер столбца таблицы, к которому относится вид (None, если
-            такого столбца нет, например у даты добавления).
+            у вида нет своего столбца).
         choices: Подвиды; первый включается, когда вид выбран впервые.
     """
 
@@ -57,14 +59,14 @@ def _alphabet(base: str) -> Tuple[SortChoice, ...]:
     return tuple(SortChoice(c.value.format(base), c.label, c.caption) for c in ALPHABET)
 
 
-# Номера столбцов: Название 0, Категория 1, Количество 2, Ед. изм. 3,
-# Срок годности 4, Место хранения 5, Состояние 6.
+# Номера столбцов: Название 0, Дата добавления 1, Категория 2, Количество 3,
+# Ед. изм. 4, Срок годности 5, Место хранения 6, Состояние 7.
 SORT_KINDS: Tuple[SortKind, ...] = (
     SortKind(
         "status",
         "По состоянию",
         "состояние",
-        6,
+        7,
         (
             SortChoice("status", "сначала просроченные", "просроч."),
             SortChoice("status_ok", "сначала норма", "норма"),
@@ -75,7 +77,7 @@ SORT_KINDS: Tuple[SortKind, ...] = (
         "quantity",
         "По количеству",
         "количество",
-        2,
+        3,
         (
             SortChoice("quantity_desc", "от большего к меньшему", "9-0"),
             SortChoice("quantity", "от меньшего к большему", "0-9"),
@@ -85,19 +87,19 @@ SORT_KINDS: Tuple[SortKind, ...] = (
         "expiry",
         "По сроку годности",
         "срок годности",
-        4,
+        5,
         (
             SortChoice("expiry", "сначала ближайшие", "ближе"),
             SortChoice("expiry_desc", "сначала самые дальние", "дальше"),
         ),
     ),
-    SortKind("category", "По категории", "категория", 1, _alphabet("category")),
-    SortKind("place", "По месту хранения", "место хранения", 5, _alphabet("place")),
+    SortKind("category", "По категории", "категория", 2, _alphabet("category")),
+    SortKind("place", "По месту хранения", "место хранения", 6, _alphabet("place")),
     SortKind(
         "added",
         "По дате добавления",
         "дата добавления",
-        None,
+        1,
         (
             SortChoice("added", "сначала новые", "новые"),
             SortChoice("added_asc", "сначала старые", "старые"),
@@ -110,6 +112,36 @@ _BY_VALUE = {
 }
 _BY_KEY = {kind.key: kind for kind in SORT_KINDS}
 _BY_COLUMN = {kind.column: kind for kind in SORT_KINDS if kind.column is not None}
+
+
+_quantity_range: Optional[Tuple[float, float]] = None
+
+
+def set_quantity_range(low: Optional[float], high: Optional[float]) -> None:
+    """Запоминает наименьшее и наибольшее количество в аптечке пользователя.
+
+    По ним подписи сортировки по количеству показывают настоящие числа
+    («3-23» и «23-3»), а не «0-9» и «9-0». Без товаров подписи прежние.
+    """
+    global _quantity_range
+    _quantity_range = None if low is None or high is None else (low, high)
+
+
+def caption_of(value: str) -> str:
+    """Короткая подпись подвида; у сортировки по количеству это числа из аптечки."""
+    choice = choice_of(value)
+    if kind_of(value).key != "quantity" or _quantity_range is None:
+        return choice.caption
+    low, high = (format_quantity(number) for number in _quantity_range)
+    return f"{high}-{low}" if value.endswith("_desc") else f"{low}-{high}"
+
+
+def label_of(value: str) -> str:
+    """Подпись подвида в списке; у количества добавлены числа («… (23-3)»)."""
+    choice = choice_of(value)
+    if kind_of(value).key != "quantity" or _quantity_range is None:
+        return choice.label
+    return f"{choice.label} ({caption_of(value)})"
 
 
 def is_sort(value: object) -> bool:
@@ -146,4 +178,4 @@ def toggled(value: str) -> str:
 
 def field_text(value: str) -> str:
     """Текст в поле выбора: «название (А-Я)»."""
-    return f"{kind_of(value).short} ({choice_of(value).caption})"
+    return f"{kind_of(value).short} ({caption_of(value)})"

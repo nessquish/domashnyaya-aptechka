@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, List, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
+from pharmacy.models import ShoppingSource
 from pharmacy.errors import NotFoundError, ValidationError
 from pharmacy.services.product_service import ProductView
 from pharmacy.services.status import ProductStatus
@@ -199,11 +200,12 @@ class ProductCardDialog(Modal):
         )
         row.addWidget(self.delete_button)
         row.addStretch(1)
-        if self._services.shopping.is_in_list(self._user.id, self._product_id):
-            self.list_button = Button("В списке покупок", icon="check")
-            self.list_button.set_enabled(False)
-        else:
-            self.list_button = Button("В список покупок", command=self._add_to_list)
+        # Нажатие добавляет ещё одну единицу: количество в списке покупок растёт.
+        in_list = self._services.shopping.is_in_list(self._user.id, self._product_id)
+        self.list_button = Button(
+            "Добавить ещё в список" if in_list else "В список покупок",
+            command=self._add_to_list,
+        )
         row.addWidget(self.list_button)
         self.edit_button = Button(
             "Редактировать", command=self._edit, variant="primary"
@@ -215,7 +217,9 @@ class ProductCardDialog(Modal):
 
     def _add_to_list(self) -> None:
         try:
-            self._services.shopping.add_from_product(self._user.id, self._product_id)
+            self._services.shopping.add_from_product(
+                self._user.id, self._product_id, source=ShoppingSource.CARD
+            )
         except (NotFoundError, ValidationError):
             pass
         self.close_modal()
