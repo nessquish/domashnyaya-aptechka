@@ -16,3 +16,6 @@ data/
 # Сборка программы в .exe (создаётся packaging\build_exe.py)
 build/
 dist/
+
+# Выгрузка экранов для Figma (создаётся tools/figma_export.py)
+design_export/
