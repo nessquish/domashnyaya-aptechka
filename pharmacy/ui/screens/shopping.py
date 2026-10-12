@@ -42,11 +42,11 @@ SOURCE_LABELS = {
 }
 COLUMNS = (
     Column("", fixed=44),
-    Column("Товар", 28),
-    Column("Количество", 16),
-    Column("Источник", 16),
-    Column("Статус", 16),
-    Column("Дата добавления", 20),
+    Column("Товар", 26),
+    Column("Дата добавления", 17),
+    Column("Количество", 14),
+    Column("Источник", 15),
+    Column("Статус", 14),
 )
 EMPTY_TEXT = "Список покупок пуст. Добавьте товар вручную или из уведомления."
 DIALOG_WIDTH = 440
@@ -230,13 +230,13 @@ class ShoppingScreen(QWidget):
                 lambda value, i=item.id: self._toggle(i, value),
             ),
             name,
+            TextCell(_created(item), muted),
             TextCell(f"{format_quantity(item.quantity)} {item.unit}", muted),
             TextCell(SOURCE_LABELS[item.source], muted),
             lambda: Badge(
                 "Куплено" if bought else "Не куплено",
                 "green" if bought else "red",
             ),
-            TextCell(_created(item), muted),
         ]
 
     def _build_footer(self, total: int, start: int, pages: int) -> None:

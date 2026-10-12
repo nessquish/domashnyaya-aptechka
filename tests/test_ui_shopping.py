@@ -62,15 +62,15 @@ class ShoppingScreenTest(ShoppingTestCase):
 
     def test_table_cells(self):
         rows = {row[1]: row for row in self.shopping.table.row_texts}
-        self.assertEqual(rows["Бинт"][2], "2 шт.")
-        self.assertEqual(rows["Бинт"][3], "Уведомление")
-        self.assertEqual(rows["Пластыри"][3], "Вручную")
-        self.assertRegex(rows["Бинт"][5], r"\d\d\.\d\d\.\d{4}")
+        self.assertEqual(rows["Бинт"][3], "2 шт.")
+        self.assertEqual(rows["Бинт"][4], "Уведомление")
+        self.assertEqual(rows["Пластыри"][4], "Вручную")
+        self.assertRegex(rows["Бинт"][2], r"\d\d\.\d\d\.\d{4}")
 
     def test_bought_item_has_the_green_badge(self):
         rows = {row[1]: row for row in self.shopping.table.row_texts}
-        self.assertEqual(rows["Витамин C"][4], "Куплено")
-        self.assertEqual(rows["Бинт"][4], "Не куплено")
+        self.assertEqual(rows["Витамин C"][5], "Куплено")
+        self.assertEqual(rows["Бинт"][5], "Не куплено")
 
     def test_bar_is_hidden_without_selection(self):
         self.assertFalse(self.shopping.bar.isVisible())

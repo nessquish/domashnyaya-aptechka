@@ -41,7 +41,7 @@ class UnitsEverywhereTest(ShellTestCase):
     def test_shopping_table_quantity_has_a_unit(self):
         page = self.open(sections.SHOPPING)
         for row in page.table.row_texts:
-            self.assertRegex(row[2], rf"^\d+([.,]\d+)? ({UNIT_PATTERN})$", row)
+            self.assertRegex(row[3], rf"^\d+([.,]\d+)? ({UNIT_PATTERN})$", row)
 
     def test_dashboard_remaining_text_has_units(self):
         texts = self.texts(self.page)
