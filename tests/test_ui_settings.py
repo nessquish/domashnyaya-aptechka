@@ -226,11 +226,11 @@ class DataTest(SettingsTestCase):
         page = self.section(DATA)
         before = self.kit_count()
         with tempfile.TemporaryDirectory() as folder:
-            source = Path(folder) / "in.json"
+            source = Path(folder) / "in.csv"
             source.write_text(
-                '[{"name": "Новый тест", "category": "Лекарства", "quantity": 2,'
-                ' "unit": "шт.", "expiry_date": "", "min_quantity": 1}]',
-                encoding="utf-8",
+                "Название;Категория;Количество;Ед. изм.\n"
+                "Новый тест;Лекарства;2;шт.\n",
+                encoding="utf-8-sig",
             )
             with mock.patch.object(page, "_choose_open_path", return_value=str(source)):
                 page._import()
@@ -464,3 +464,18 @@ class EditLoginTest(SettingsTestCase):
             modal._submit()
             self.assertTrue(modal.is_open, bad)
             self.assertIsNotNone(modal.fields["login"].error, bad)
+
+
+class TemplateButtonsTest(SettingsTestCase):
+    def test_both_templates_can_be_saved(self):
+        import tempfile
+        from pathlib import Path
+
+        page = self.section(DATA)
+        self.assertEqual(set(page.template_buttons), {"csv", "xlsx"})
+        with tempfile.TemporaryDirectory() as folder:
+            for fmt in ("csv", "xlsx"):
+                target = str(Path(folder) / f"t.{fmt}")
+                with mock.patch.object(page, "_choose_save_path", return_value=target):
+                    page.template_buttons[fmt].invoke()
+                self.assertTrue(Path(target).exists(), fmt)

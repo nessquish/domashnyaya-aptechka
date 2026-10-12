@@ -3,6 +3,7 @@
 import csv
 import json
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
@@ -11,6 +12,7 @@ from pharmacy.errors import ValidationError
 from pharmacy.services.product_service import ProductForm, ProductService
 from pharmacy.utils.dates import format_user_date
 from pharmacy.utils.formatting import format_quantity
+from pharmacy.utils.units import UNITS
 
 FORMATS = ("csv", "json", "xlsx")
 CSV_DELIMITER = ";"  # так открывают файл русские версии Excel
@@ -138,6 +140,108 @@ class DataService:
             sheet.column_dimensions[column].width = max(14, len(title) + 4)
         book.save(path)
 
+    # --- шаблон для импорта ---
+
+    def write_template(self, path: Union[str, Path], fmt: str) -> None:
+        """Записывает пустой шаблон для заполнения и последующего импорта.
+
+        В шаблоне заголовки столбцов, две строки-примера и подсказки: какие
+        категории и единицы допустимы и в каком виде вводить срок годности.
+
+        Args:
+            path: Куда сохранить.
+            fmt: ``csv`` или ``xlsx``.
+
+        Raises:
+            ValidationError: Если формат не поддерживается.
+        """
+        if fmt not in ("csv", "xlsx"):
+            raise ValidationError("Шаблон есть для файлов CSV и Excel")
+        categories = [c.name for c in self._products.list_categories()]
+        examples = [
+            [
+                "Ибупрофен",
+                categories[0],
+                2,
+                "упак.",
+                "31.12.2027",
+                "Жаропонижающее",
+                "Шкаф",
+                1,
+                "Пример: замените или удалите строку",
+            ],
+            [
+                "Бинт",
+                categories[1 % len(categories)],
+                5,
+                "шт.",
+                "",
+                "",
+                "Аптечка",
+                2,
+                "",
+            ],
+        ]
+        path = Path(path)
+        if fmt == "csv":
+            with path.open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.writer(handle, delimiter=CSV_DELIMITER)
+                writer.writerow(COLUMNS.values())
+                writer.writerows(examples)
+        else:
+            self._write_excel_template(path, categories, examples)
+
+    @staticmethod
+    def _write_excel_template(
+        path: Path, categories: List[str], examples: List[List[object]]
+    ) -> None:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        from openpyxl.worksheet.datavalidation import DataValidation
+
+        book = Workbook()
+        sheet = book.active
+        sheet.title = "Аптечка"
+        sheet.append(list(COLUMNS.values()))
+        for row in examples:
+            sheet.append(row)
+        head_fill = PatternFill("solid", fgColor="E6E6FA")
+        for cell in sheet[1]:
+            cell.font = Font(bold=True)
+            cell.fill = head_fill
+        for column, title in zip("ABCDEFGHI", COLUMNS.values()):
+            sheet.column_dimensions[column].width = max(16, len(title) + 6)
+        sheet.column_dimensions["I"].width = 36
+        # Срок годности вводится текстом ДД.ММ.ГГГГ: Excel не превратит его в число.
+        sheet.column_dimensions["E"].number_format = "@"
+        hints = book.create_sheet("Подсказки")
+        hints.column_dimensions["A"].width = 28
+        hints.column_dimensions["B"].width = 60
+        hints.append(["Как заполнять", ""])
+        hints["A1"].font = Font(bold=True)
+        hints.append(["Обязательные столбцы", "Название, Категория, Количество"])
+        hints.append(["Срок годности", "ДД.ММ.ГГГГ, например 31.12.2027, или пусто"])
+        hints.append(["Количество", "Число, дробное через запятую или точку"])
+        hints.append(["Строки-примеры", "Замените их своими данными или удалите"])
+        hints.append(["", ""])
+        hints.append(["Допустимые категории", ""])
+        for name in categories:
+            hints.append(["", name])
+        hints.append(["", ""])
+        hints.append(["Единицы измерения", ", ".join(UNITS)])
+        categories_ref = f"Подсказки!$B$8:$B${7 + len(categories)}"
+        by_category = DataValidation(
+            type="list", formula1=f"={categories_ref}", allow_blank=True
+        )
+        by_unit = DataValidation(
+            type="list", formula1='"' + ",".join(UNITS) + '"', allow_blank=True
+        )
+        sheet.add_data_validation(by_category)
+        sheet.add_data_validation(by_unit)
+        by_category.add("B2:B1000")
+        by_unit.add("D2:D1000")
+        book.save(path)
+
     # --- импорт ---
 
     def import_products(self, user_id: int, path: Union[str, Path]) -> ImportResult:
@@ -189,25 +293,32 @@ class DataService:
         from openpyxl import load_workbook
 
         book = load_workbook(path, read_only=True, data_only=True)
-        sheet = book.active
-        rows = sheet.iter_rows(values_only=True)
         try:
-            header = next(rows)
-        except StopIteration:
-            return []
-        titles = [
-            _BY_TITLE.get(str(cell).strip().casefold()) if cell is not None else None
-            for cell in header
-        ]
-        records = []
-        for raw in rows:
-            record = {}
-            for key, value in zip(titles, raw):
-                if key is not None and value is not None:
-                    record[key] = value
-            if record:
-                records.append(record)
-        return records
+            sheet = book.active
+            rows = sheet.iter_rows(values_only=True)
+            try:
+                header = next(rows)
+            except StopIteration:
+                return []
+            titles = [
+                (
+                    _BY_TITLE.get(str(cell).strip().casefold())
+                    if cell is not None
+                    else None
+                )
+                for cell in header
+            ]
+            records = []
+            for raw in rows:
+                record = {}
+                for key, value in zip(titles, raw):
+                    if key is not None and value is not None:
+                        record[key] = value
+                if record:
+                    records.append(record)
+            return records
+        finally:
+            book.close()  # иначе Windows держит файл открытым
 
     @staticmethod
     def _read_csv(path: Path) -> List[Dict[str, object]]:
@@ -231,6 +342,10 @@ class DataService:
     def _form(record: Dict[str, object], categories: Dict[str, int]) -> ProductForm:
         def text(key: str) -> str:
             value = record.get(key)
+            if isinstance(value, (datetime, date)):  # дата, введённая в Excel
+                return format_user_date(
+                    value.date() if isinstance(value, datetime) else value
+                )
             return "" if value is None else str(value).strip()
 
         name = text("category").casefold()

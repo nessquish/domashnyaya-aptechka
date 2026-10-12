@@ -9,7 +9,9 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from pharmacy.models import HistoryRecord
 from pharmacy.ui.fonts import line_height
 from pharmacy.ui.widgets.button import Button
+from pharmacy.ui.paging import fit_scroll
 from pharmacy.ui.widgets.card import Card
+from pharmacy.ui.widgets.scroll import ScrollArea
 from pharmacy.ui.widgets.dialog import Dialog
 from pharmacy.ui.widgets.common import Line, clear_layout, label, pad
 from pharmacy.ui.widgets.field import TextField
@@ -92,10 +94,10 @@ class HistoryScreen(QWidget):
         header.actions.addWidget(self.clear_button, 0, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(header)
         self._card = Card()
-        self._list = QVBoxLayout()
-        self._list.setContentsMargins(0, 0, 0, 0)
-        self._list.setSpacing(0)
-        self._card.body.addLayout(self._list)
+        # Листается только список внутри карточки, шапка и кнопки остаются.
+        self._scroll = ScrollArea(gutter=8)
+        self._list = self._scroll.body
+        self._card.body.addWidget(self._scroll)
         layout.addWidget(self._card)
         layout.addStretch(1)
         self._reload()
@@ -123,6 +125,17 @@ class HistoryScreen(QWidget):
             needle = self._query.casefold()
             records = [r for r in records if needle in r.description.casefold()]
         return records
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self.fit_rows)
+
+    def fit_rows(self) -> None:
+        """Подгоняет высоту списка под окно (вызывается и при смене размера окна)."""
+        try:
+            fit_scroll(self, self._card, self._scroll, self._shell.viewport_height())
+        except RuntimeError:  # экран уже закрыт
+            pass
 
     def _reload(self) -> None:
         self._events: List[QWidget] = []

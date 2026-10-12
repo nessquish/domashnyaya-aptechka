@@ -520,6 +520,15 @@ class SettingsScreen(QWidget):
         for fmt, title in IMPORT_FORMATS:
             row.addWidget(Button(title, self._import, size="sm"))
             row.addSpacing(4)
+        row, _ = self._row(
+            "Шаблон для импорта", "Файл для заполнения: столбцы, примеры и подсказки"
+        )
+        self.template_buttons = {}
+        for fmt, title in IMPORT_FORMATS:
+            button = Button(title, lambda f=fmt: self._save_template(f), size="sm")
+            self.template_buttons[fmt] = button
+            row.addWidget(button)
+            row.addSpacing(4)
         row, _ = self._row("Очистить историю", "Удалить все записи истории")
         self.clear_history_button = Button(
             "Очистить", self._confirm_clear_history, variant="danger", size="sm"
@@ -533,11 +542,22 @@ class SettingsScreen(QWidget):
         )
         row.addWidget(self.reset_button)
 
-    def _choose_save_path(self, fmt: str) -> str:
+    def _choose_save_path(self, fmt: str, name: str = "aptechka") -> str:
         path, _ = QFileDialog.getSaveFileName(
-            self.window(), "Экспорт данных", f"aptechka.{fmt}", FILTERS[fmt]
+            self.window(), "Сохранить файл", f"{name}.{fmt}", FILTERS[fmt]
         )
         return path
+
+    def _save_template(self, fmt: str) -> None:
+        path = self._choose_save_path(fmt, "aptechka_shablon")
+        if not path:
+            return
+        try:
+            self._services.data.write_template(path, fmt)
+        except (ValidationError, OSError) as error:
+            self._info("Не удалось сохранить", str(getattr(error, "message", error)))
+            return
+        self._show_notice("Шаблон сохранён")
 
     def _choose_open_path(self) -> str:
         path, _ = QFileDialog.getOpenFileName(

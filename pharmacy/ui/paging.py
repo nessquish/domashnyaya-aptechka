@@ -63,3 +63,32 @@ def fitted_rows(
     rows = max(MIN_ROWS, min(rows, MAX_ROWS))
     _remembered[key] = rows
     return rows
+
+
+MIN_SCROLL_HEIGHT = 120
+
+
+def fit_scroll(
+    screen: QWidget,
+    card: QWidget,
+    scroll: QWidget,
+    viewport_height: int,
+) -> None:
+    """Задаёт высоту списка внутри карточки: по содержимому, но не ниже низа окна.
+
+    Страница при этом не прокручивается целиком: шапка и кнопки стоят на
+    месте, а листается только сам список (полоса прокрутки внутри карточки).
+
+    Args:
+        screen: Экран раздела.
+        card: Карточка, в которой лежит список.
+        scroll: Прокручиваемая область со списком.
+        viewport_height: Высота видимой области окна.
+    """
+    if not AUTO_FIT or viewport_height <= 0 or not screen.isVisible():
+        return
+    top = scroll.mapTo(screen, QPoint(0, 0)).y()
+    below = card.mapTo(screen, QPoint(0, card.height())).y() - (top + scroll.height())
+    available = viewport_height - top - below - BOTTOM_GAP
+    content = scroll.widget().sizeHint().height()
+    scroll.setFixedHeight(max(min(content, available), MIN_SCROLL_HEIGHT))

@@ -74,30 +74,27 @@ class ImportTest(DataTestCase):
         self.assertEqual((result.added, result.skipped), (2, 0))
         self.assertEqual(len(self.products(other)), 2)
 
-    def test_round_trip_through_json(self):
-        path = self.folder / "a.json"
-        self.services.data.export_products(self.user_id, path, "json")
+    def test_round_trip_through_excel(self):
+        path = self.folder / "a.xlsx"
+        self.services.data.export_products(self.user_id, path, "xlsx")
         other = self.add_user("boris")
         self.assertEqual(self.services.data.import_products(other, path).added, 2)
 
     def test_bad_rows_are_skipped_and_reported(self):
-        path = self.folder / "a.json"
+        path = self.folder / "a.csv"
         path.write_text(
-            json.dumps(
-                [
-                    {"name": "Хороший", "category": "Лекарства", "quantity": 1},
-                    {"name": "", "category": "Лекарства", "quantity": 1},
-                    {"name": "Без категории", "category": "Нет такой", "quantity": 1},
-                ]
-            ),
-            encoding="utf-8",
+            "Название;Категория;Количество\n"
+            "Хороший;Лекарства;1\n"
+            ";Лекарства;1\n"
+            "Без категории;Нет такой;1\n",
+            encoding="utf-8-sig",
         )
         result = self.services.data.import_products(self.user_id, path)
         self.assertEqual((result.added, result.skipped), (1, 2))
         self.assertTrue(result.errors[0].startswith("Строка 2"))
 
     def test_other_extensions_and_broken_files_are_rejected(self):
-        for name, text in (("a.txt", "x"), ("a.json", "{oops")):
+        for name, text in (("a.txt", "x"), ("a.json", "[]")):
             path = self.folder / name
             path.write_text(text, encoding="utf-8")
             with self.assertRaises(ValidationError):
@@ -161,3 +158,47 @@ class ManualScaleTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TemplateTest(DataTestCase):
+    def test_csv_template_imports_back(self):
+        path = self.folder / "t.csv"
+        self.services.data.write_template(path, "csv")
+        other = self.add_user("boris")
+        result = self.services.data.import_products(other, path)
+        self.assertEqual((result.added, result.skipped), (2, 0))
+
+    def test_excel_template_has_header_examples_and_hints(self):
+        from openpyxl import load_workbook
+
+        path = self.folder / "t.xlsx"
+        self.services.data.write_template(path, "xlsx")
+        book = load_workbook(path)
+        self.assertEqual(book.sheetnames, ["Аптечка", "Подсказки"])
+        sheet = book["Аптечка"]
+        self.assertEqual(sheet["A1"].value, "Название")
+        self.assertEqual(sheet.max_row, 3)
+        hints = [row[1].value for row in book["Подсказки"].iter_rows()]
+        self.assertIn("Лекарства", hints)
+
+    def test_excel_template_imports_back_and_dates_typed_in_excel_work(self):
+        from datetime import datetime
+        from openpyxl import load_workbook
+
+        path = self.folder / "t.xlsx"
+        self.services.data.write_template(path, "xlsx")
+        book = load_workbook(path)
+        book["Аптечка"]["E3"] = datetime(2030, 5, 17)  # дата, введённая как дата
+        book.save(path)
+        other = self.add_user("boris")
+        result = self.services.data.import_products(other, path)
+        self.assertEqual((result.added, result.skipped), (2, 0))
+        dates = {
+            v.product.name: v.product.expiry_date
+            for v in self.services.products.list_products(other)
+        }
+        self.assertEqual(dates["Бинт"].isoformat(), "2030-05-17")
+
+    def test_unknown_template_format_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            self.services.data.write_template(self.folder / "t.json", "json")

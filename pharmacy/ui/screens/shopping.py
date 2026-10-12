@@ -240,15 +240,16 @@ class ShoppingScreen(QWidget):
     def _build_footer(self, total: int, start: int, pages: int) -> None:
         """Строка «Показано …» и переключатель страниц."""
         clear_layout(self._footer)
-        if pages <= 1:
-            return
         self._footer.addWidget(Line("line"))
         row = QHBoxLayout()
         row.setContentsMargins(14, 10, 14, 10)
         shown = len(self._visible)
-        self.summary = label(
-            f"Показано {start + 1}–{start + shown} из {total}", "small", "ink_2"
+        text = (
+            f"Показано {start + 1}–{start + shown} из {total}"
+            if shown
+            else "Показано 0 из 0"
         )
+        self.summary = label(text, "small", "ink_2")
         row.addWidget(self.summary)
         row.addStretch(1)
         self.pagination = Pagination(self._page, pages, self._on_page)
