@@ -19,7 +19,7 @@ class UserRepositoryTest(DatabaseTestCase):
         self.assertEqual(user.login, "anna")
         self.assertEqual(user.username, "Анна")
         self.assertEqual(user.warning_days, 30)
-        self.assertEqual(user.theme, "light")
+        self.assertEqual(user.theme, "system")
         self.assertTrue(user.notify_expired)
         self.assertTrue(user.notify_low_stock)
 

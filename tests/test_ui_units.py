@@ -28,8 +28,8 @@ class UnitsEverywhereTest(ShellTestCase):
     def test_kit_table_has_a_unit_in_every_row(self):
         kit = self.open(sections.MY_KIT)
         for row in kit.table.row_texts:
-            self.assertIn(row[3], UNITS, row)  # столбец «Ед. изм.»
-            self.assertTrue(row[2], row)  # и число рядом
+            self.assertIn(row[4], UNITS, row)  # столбец «Ед. изм.»
+            self.assertTrue(row[3], row)  # и число рядом
 
     def test_product_card_quantity_and_minimum_have_units(self):
         self.shell.open_product(self.product_id("Ибупрофен"))

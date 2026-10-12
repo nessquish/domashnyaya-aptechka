@@ -7,10 +7,17 @@ from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from pharmacy.models import Product
+from pharmacy.services.history_service import ACTION_LABELS
+from pharmacy.services.notification_service import KIND_LABELS
+from pharmacy.ui.screens.shopping import SOURCE_LABELS
 from pharmacy.ui.paint import begin, fill_rounded
 from pharmacy.ui.search_index import (
+    CARD,
+    HISTORY,
     MAX_RESULTS,
+    NOTIFICATION,
     PRODUCT,
+    SHOPPING,
     SearchEntry,
     Target,
     search_sections,
@@ -29,8 +36,7 @@ if TYPE_CHECKING:
 
 WIDTH = 560
 EMPTY_TEXT = "Ничего не найдено"
-HINT_TEXT = "Введите название товара или настройки"
-PRODUCTS_TITLE = "Товары"
+HINT_TEXT = "Введите название товара, раздела или настройки"
 SECTIONS_TITLE = "Разделы и настройки"
 ROW_RADIUS = 8
 MODAL_MARGIN = 220  # сколько места окна занимают поле, отступы и поля вокруг
@@ -98,9 +104,10 @@ class SearchModal(Modal):
         self._services = services
         self._user_id = user_id
         self.rows: List[_ResultRow] = []
+        self.group_titles: List[str] = []
         self.active_index = -1
         self.field = TextField(
-            placeholder="Поиск по товарам и настройкам…",
+            placeholder="Поиск по товарам, истории и настройкам…",
             leading_icon="search",
             on_change=self._update,
         )
@@ -135,33 +142,111 @@ class SearchModal(Modal):
         query = self.field.get().strip()
         clear_layout(self._results)
         self.rows = []
+        self.group_titles = []
         self.active_index = -1
         if not query:
             self._message(HINT_TEXT)
             QTimer.singleShot(0, self._fit_height)
             return
-        products = self._services.products.search_products(
-            self._user_id, query, MAX_RESULTS
-        )
-        entries = search_sections(query, MAX_RESULTS)
-        if not products and not entries:
+        found = self._collect(query)
+        if not found:
             self._message(EMPTY_TEXT)
             QTimer.singleShot(0, self._fit_height)
             return
-        if products:
-            self._group(PRODUCTS_TITLE)
-            for product in products:
-                self._add(
-                    product.name,
-                    self._product_caption(product),
-                    Target(PRODUCT, product.id),
-                )
-        if entries:
-            self._group(SECTIONS_TITLE)
-            for entry in entries:
-                self._add_entry(entry)
+        for title, rows in found:
+            self._group(title)
+            for row_title, caption, target in rows:
+                self._add(row_title, caption, target)
         self._set_active(0)
         QTimer.singleShot(0, self._fit_height)
+
+    def _collect(self, query: str):
+        """Все места, где есть найденное: группы строк (название, подпись, цель).
+
+        Товар можно открыть в таблице «Моя аптечка» и в карточке; если он есть
+        в списке покупок, уведомлениях или истории, то и там.
+        """
+        services, user_id = self._services, self._user_id
+        groups = []
+        products = services.products.search_products(user_id, query, MAX_RESULTS)
+        if products:
+            groups.append(
+                (
+                    "Моя аптечка",
+                    [
+                        (p.name, self._product_caption(p), Target(PRODUCT, p.id))
+                        for p in products
+                    ],
+                )
+            )
+            groups.append(
+                (
+                    "Карточка товара",
+                    [
+                        (
+                            p.name,
+                            "Открыть карточку: " + p.category_name,
+                            Target(CARD, p.id),
+                        )
+                        for p in products
+                    ],
+                )
+            )
+        shopping = services.shopping.search_items(user_id, query, MAX_RESULTS)
+        if shopping:
+            groups.append(
+                (
+                    "Список покупок",
+                    [
+                        (i.name, self._shopping_caption(i), Target(SHOPPING, i.id))
+                        for i in shopping
+                    ],
+                )
+            )
+        notifications = services.notifications.search(user_id, query, MAX_RESULTS)
+        if notifications:
+            groups.append(
+                (
+                    "Уведомления",
+                    [
+                        (
+                            KIND_LABELS.get(n.kind, "Уведомление"),
+                            n.message,
+                            Target(NOTIFICATION, n.id),
+                        )
+                        for n in notifications
+                    ],
+                )
+            )
+        records = services.history.search(user_id, query, MAX_RESULTS)
+        if records:
+            groups.append(
+                (
+                    "История",
+                    [
+                        (
+                            ACTION_LABELS.get(r.action, "Действие"),
+                            f"{r.description} · {r.created_at[:16]}",
+                            Target(HISTORY, query),
+                        )
+                        for r in records
+                    ],
+                )
+            )
+        entries = search_sections(query, MAX_RESULTS)
+        if entries:
+            groups.append(
+                (SECTIONS_TITLE, [(e.title, e.path, e.target) for e in entries])
+            )
+        return groups
+
+    @staticmethod
+    def _shopping_caption(item) -> str:
+        state = "куплено" if item.is_bought else "нужно купить"
+        return (
+            f"{format_quantity(item.quantity)} {item.unit} · {state}"
+            f" · {SOURCE_LABELS.get(item.source, '')}"
+        )
 
     def _fit_height(self) -> None:
         """Высота списка по содержимому, но не больше места в окне."""
@@ -192,6 +277,7 @@ class SearchModal(Modal):
         self._results.addWidget(message)
 
     def _group(self, title: str) -> None:
+        self.group_titles.append(title)
         heading = label(title, "small_medium", "ink_3")
         pad(heading, 12, 10, 0, 4)
         self._results.addWidget(heading)

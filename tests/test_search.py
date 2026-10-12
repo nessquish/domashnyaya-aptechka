@@ -135,10 +135,75 @@ class SearchWindowTest(ShellTestCase):
         modal = self.open_search()
         self.type(modal, "а")
         self.assertTrue(modal.rows)
-        kinds = [row.target.kind for row in modal.rows]
-        self.assertLessEqual(kinds.count(PRODUCT), MAX_RESULTS)
-        self.assertLessEqual(len(kinds) - kinds.count(PRODUCT), MAX_RESULTS)
-        self.assertEqual(kinds, sorted(kinds, key=lambda k: k != PRODUCT))
+        by_kind = {}
+        for row in modal.rows:
+            by_kind[row.target.kind] = by_kind.get(row.target.kind, 0) + 1
+        self.assertTrue(all(count <= MAX_RESULTS for count in by_kind.values()))
+
+    def test_product_is_offered_everywhere_it_can_be_viewed(self):
+        modal = self.open_search()
+        self.type(modal, "ибупрофен")
+        self.assertEqual(
+            modal.group_titles,
+            [
+                "Моя аптечка",
+                "Карточка товара",
+                "Список покупок",
+                "Уведомления",
+                "История",
+            ],
+        )
+        kinds = {row.target.kind for row in modal.rows}
+        self.assertEqual(
+            kinds, {PRODUCT, "card", "shopping", "notification", "history"}
+        )
+
+    def test_card_result_opens_the_product_card(self):
+        from pharmacy.ui.screens.product_card import ProductCardDialog
+        from tests.qt_helpers import find_all
+
+        modal = self.open_search()
+        self.type(modal, "ибупрофен")
+        row = next(r for r in modal.rows if r.target.kind == "card")
+        click(row)
+        self.settle()
+        self.assertEqual(len(find_all(self.app, ProductCardDialog)), 1)
+
+    def test_shopping_result_opens_the_list_and_highlights_the_row(self):
+        modal = self.open_search()
+        self.type(modal, "ибупрофен")
+        row = next(r for r in modal.rows if r.target.kind == "shopping")
+        click(row)
+        self.settle()
+        self.assertEqual(self.shell.section, sections.SHOPPING)
+        page = self.page
+        shown = [item.id for item in page._visible]
+        self.assertIn(row.target.value, shown)
+        self.assertIn(shown.index(row.target.value), page.table._fills)
+
+    def test_notification_result_opens_the_notifications(self):
+        modal = self.open_search()
+        self.type(modal, "ибупрофен")
+        row = next(r for r in modal.rows if r.target.kind == "notification")
+        click(row)
+        self.settle()
+        self.assertEqual(self.shell.section, sections.NOTIFICATIONS)
+        self.assertIn(row.target.value, self.page._rows)
+
+    def test_history_result_opens_the_history_filtered_by_the_text(self):
+        modal = self.open_search()
+        self.type(modal, "ибупрофен")
+        row = next(r for r in modal.rows if r.target.kind == "history")
+        click(row)
+        self.settle()
+        self.assertEqual(self.shell.section, sections.HISTORY)
+        self.assertEqual(self.page._query, "ибупрофен")
+        self.assertTrue(self.page.event_rows)
+
+    def test_word_forms_are_found(self):
+        modal = self.open_search()
+        self.type(modal, "парацетамола")
+        self.assertIn("Парацетамол", [r.title for r in modal.rows])
 
     def test_nothing_found_message(self):
         modal = self.open_search()

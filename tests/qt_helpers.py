@@ -69,6 +69,9 @@ class AppTestCase(DatabaseTestCase):
     def setUp(self) -> None:
         super().setUp()
         paging.AUTO_FIT = False  # страницы по 8 строк, окно теста не меряем
+        # Тема системы на этом ПК не должна влиять на тесты: всегда светлая.
+        self.addCleanup(setattr, runtime, "system_theme", runtime.system_theme)
+        runtime.system_theme = lambda: "light"
         self.addCleanup(setattr, paging, "AUTO_FIT", True)
         self.services = build_services(self.db)
         self.services.auth.register(

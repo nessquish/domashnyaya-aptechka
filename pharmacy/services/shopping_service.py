@@ -14,6 +14,7 @@ from pharmacy.services.product_service import (
     _parse_amount,
 )
 from pharmacy.utils.formatting import format_quantity
+from pharmacy.utils.textmatch import name_matches
 from pharmacy.utils.units import DEFAULT_UNIT, normalize_unit
 
 
@@ -170,6 +171,17 @@ class ShoppingService:
                 conn,
             )
         return self._require(user_id, item.id)
+
+    def search_items(
+        self, user_id: int, query: str, limit: int = 10
+    ) -> List[ShoppingItem]:
+        """Ищет позиции списка покупок по названию (для поиска по программе)."""
+        found = [
+            item
+            for item in self._items.list_for_user(user_id)
+            if name_matches(item.name, query)
+        ]
+        return found[:limit]
 
     def is_in_list(self, user_id: int, product_id: int) -> bool:
         """Проверяет, есть ли товар в списке покупок среди не купленных."""

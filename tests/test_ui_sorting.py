@@ -59,7 +59,7 @@ class SortingDataTest(unittest.TestCase):
         self.assertEqual(sorting.kind_for_column(3).key, "quantity")
         self.assertEqual(sorting.kind_for_column(7).key, "status")
         self.assertIsNone(sorting.kind_for_column(4))  # «Ед. изм.» не сортируется
-        self.assertIsNone(sorting.kind_by_key("added").column)
+        self.assertEqual(sorting.kind_by_key("added").column, 1)
 
     def test_field_text(self):
         self.assertEqual(sorting.field_text("name"), "название (А-Я)")

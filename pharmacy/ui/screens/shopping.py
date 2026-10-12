@@ -51,6 +51,7 @@ COLUMNS = (
 EMPTY_TEXT = "Список покупок пуст. Добавьте товар вручную или из уведомления."
 DIALOG_WIDTH = 440
 PAGING_KEY = "shopping"
+FLASH_MS = 4000  # сколько держится подсветка найденной позиции
 
 
 def _created(item: ShoppingItem) -> str:
@@ -84,6 +85,7 @@ class ShoppingScreen(QWidget):
         self._page = 1
         self._page_size = remembered_rows(PAGING_KEY)
         self._returning = False
+        self._flash_id: Optional[int] = None  # найденная поиском позиция
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(0)
@@ -199,7 +201,7 @@ class ShoppingScreen(QWidget):
             for item in self._visible:
                 self._table.add_row(
                     self._cells(item),
-                    item.id in self._selected,
+                    item.id in self._selected or item.id == self._flash_id,
                     on_click=lambda i=item.id: self._flip(i),
                 )
             self._build_footer(len(found), start, pages)
@@ -255,6 +257,28 @@ class ShoppingScreen(QWidget):
         self.pagination = Pagination(self._page, pages, self._on_page)
         row.addWidget(self.pagination)
         self._footer.addLayout(row)
+
+    def reveal(self, item_id: int) -> None:
+        """Показывает страницу, где стоит позиция, и подсвечивает её на пару секунд."""
+        self._filter = 0
+        self._tabs.select(0)
+        found = self._services.shopping.list_items(self._user.id)
+        for index, item in enumerate(found):
+            if item.id == item_id:
+                self._page = index // self._page_size + 1
+                self._flash_id = item_id
+                self._reload()
+                QTimer.singleShot(FLASH_MS, self._clear_flash)
+                return
+
+    def _clear_flash(self) -> None:
+        try:
+            flashed, self._flash_id = self._flash_id, None
+            ids = [item.id for item in self._visible]
+            if flashed in ids and flashed not in self._selected:
+                self._table.set_row_selected(ids.index(flashed), False)
+        except RuntimeError:  # экран уже закрыт
+            pass
 
     def _on_page(self, page: int) -> None:
         self._page = page

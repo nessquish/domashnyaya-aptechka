@@ -12,6 +12,10 @@ from pharmacy.ui import sections
 SECTION = "section"  # раздел главного меню
 SETTINGS = "settings"  # раздел экрана «Настройки»
 PRODUCT = "product"  # товар в «Моей аптечке»
+CARD = "card"  # карточка товара
+SHOPPING = "shopping"  # позиция списка покупок
+NOTIFICATION = "notification"  # уведомление
+HISTORY = "history"  # записи истории с этим текстом
 
 # Ключи разделов настроек (совпадают с ключами в screens/settings.py).
 APPEARANCE = "appearance"

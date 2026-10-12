@@ -207,6 +207,16 @@ class HistoryScreen(QWidget):
 
     # --- события ---
 
+    def show_query(self, query: str) -> None:
+        """Показывает записи с этим текстом за всё время (из поиска по программе)."""
+        self._period = periods.ALL_TIME
+        self.period_select.set(self._period)
+        self._action = None
+        self.action_select.set(None)
+        self._query = query
+        self._search.set(query)
+        self._reload()
+
     def _confirm_clear(self) -> None:
         Dialog(
             self._shell.app,

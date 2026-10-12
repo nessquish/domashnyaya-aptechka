@@ -4,7 +4,8 @@ import re
 from typing import List
 
 _WORD = re.compile(r"\w+", re.UNICODE)
-MIN_STEM = 3  # короче этого общее начало слов не считается совпадением
+MIN_STEM = 3  # слово короче этого не считается началом более длинного запроса
+MIN_COMMON = 4  # сколько букв должно совпасть у разных форм одного слова
 
 
 def _normalize(text: str) -> str:
@@ -29,7 +30,7 @@ def _same_word(query_word: str, word: str) -> bool:
         if first != second:
             break
         common += 1
-    return common >= max(MIN_STEM, min(len(query_word), len(word)) - 2)
+    return common >= max(MIN_COMMON, min(len(query_word), len(word)) - 2)
 
 
 def name_matches(text: str, query: str) -> bool:

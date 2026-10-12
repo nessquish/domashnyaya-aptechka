@@ -92,6 +92,7 @@ class NotificationsScreen(QWidget):
         self._services = shell.services
         self._user = shell.user
         self._tab = 0
+        self._rows = {}
         self._measure_actions()
         self._period = periods.ALL_TIME
         layout = QVBoxLayout(self)
@@ -193,12 +194,24 @@ class NotificationsScreen(QWidget):
         except RuntimeError:  # экран уже закрыт
             pass
 
+    def reveal(self, notification_id: int) -> None:
+        """Показывает все уведомления и прокручивает список к нужному."""
+        self._tab = 0
+        self._period = periods.ALL_TIME
+        self.period_select.set(self._period)
+        self._tabs.select(0)
+        self._reload()
+        row = self._rows.get(notification_id)
+        if row is not None:
+            QTimer.singleShot(0, lambda: self._scroll.ensureWidgetVisible(row))
+
     def _reload(self) -> None:
         """Перерисовывает вкладки и список и обновляет счётчик в меню."""
         self.setUpdatesEnabled(False)
         try:
             self._tabs.set_items(self._tab_labels())
             clear_layout(self._list)
+            self._rows = {}
             items = self._visible()
             if not items:
                 message = label(EMPTY_TEXT, "body", "ink_3")
@@ -208,7 +221,9 @@ class NotificationsScreen(QWidget):
             for index, item in enumerate(items):
                 if index:
                     self._list.addWidget(Line("line"))
-                self._list.addWidget(self._row(item))
+                row = self._row(item)
+                self._rows[item.id] = row
+                self._list.addWidget(row)
         finally:
             self.setUpdatesEnabled(True)
         self._shell.refresh_counters()

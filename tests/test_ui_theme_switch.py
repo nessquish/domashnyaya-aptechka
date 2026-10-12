@@ -16,11 +16,11 @@ class ThemeSwitchTest(ShellTestCase):
     def test_toggle_switches_to_dark_and_back(self):
         self.toggle()
         self.assertEqual(theme.theme_name(), "dark")
-        self.assertEqual(self.app.user.theme, "dark")
+        self.assertEqual(self.app.theme_mode(self.app.user), "dark")
         self.assertEqual(self.shell.sidebar.theme_link.text(), "Светлая тема")
         self.toggle()
         self.assertEqual(theme.theme_name(), "light")
-        self.assertEqual(self.app.user.theme, "light")
+        self.assertEqual(self.app.theme_mode(self.app.user), "light")
 
     def test_menu_link_switches_the_theme(self):
         click(self.shell.sidebar.theme_link)
@@ -29,8 +29,9 @@ class ThemeSwitchTest(ShellTestCase):
 
     def test_choice_is_saved_for_the_next_sign_in(self):
         self.toggle()
-        saved = self.services.settings.get_user(self.app.user.id)
-        self.assertEqual(saved.theme, "dark")
+        # Выбор темы хранится для устройства и действует и при следующем входе.
+        self.assertEqual(self.app.preferences.get(0, "theme_mode"), "dark")
+        self.assertEqual(self.app.theme_mode(self.app.user), "dark")
 
     def test_current_section_is_kept(self):
         self.open(sections.HISTORY)
@@ -58,7 +59,9 @@ class ThemeSwitchTest(ShellTestCase):
         self.assertEqual((saved.warning_days, saved.notify_low_stock), (12, False))
 
     def test_setting_the_same_theme_does_nothing(self):
-        shell = self.shell
+        self.shell.set_theme("light")
+        self.settle()
+        shell = self.app.screen_widget
         shell.set_theme("light")
         self.settle()
         self.assertIs(self.app.screen_widget, shell)
@@ -104,7 +107,9 @@ class SystemThemeTest(ShellTestCase):
         self.addCleanup(setattr, runtime, "system_theme", original)
 
     def choose_system(self):
-        self.shell.set_theme("system")
+        self.shell.set_theme("light")  # выбор по умолчанию уже «системная»
+        self.settle()
+        self.app.screen_widget.set_theme("system")
         self.settle()
 
     def test_system_choice_follows_the_system(self):

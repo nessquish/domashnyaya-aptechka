@@ -24,7 +24,16 @@ from pharmacy.services.container import Services
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import sections, theme
 from pharmacy.ui.preferences import GLOBAL_USER, MENU_ICONS
-from pharmacy.ui.search_index import PRODUCT, SECTION, SETTINGS, Target
+from pharmacy.ui.search_index import (
+    CARD,
+    HISTORY,
+    NOTIFICATION,
+    PRODUCT,
+    SECTION,
+    SETTINGS,
+    SHOPPING,
+    Target,
+)
 from pharmacy.ui.theme import CARD_SHADOW_PAD, palette
 
 if TYPE_CHECKING:
@@ -192,6 +201,20 @@ class MainShell(QWidget):
             self.navigate(sections.MY_KIT)
             if isinstance(self._current, MyKitScreen):
                 self._current.reveal(int(target.value))
+        elif target.kind == CARD:
+            self.open_product(int(target.value))
+        elif target.kind == SHOPPING:
+            self.navigate(sections.SHOPPING)
+            if isinstance(self._current, ShoppingScreen):
+                self._current.reveal(int(target.value))
+        elif target.kind == NOTIFICATION:
+            self.navigate(sections.NOTIFICATIONS)
+            if isinstance(self._current, NotificationsScreen):
+                self._current.reveal(int(target.value))
+        elif target.kind == HISTORY:
+            self.navigate(sections.HISTORY)
+            if isinstance(self._current, HistoryScreen):
+                self._current.show_query(str(target.value))
 
     def open_profile(self) -> None:
         """Открывает профиль пользователя: настройки, раздел «Аккаунт»."""

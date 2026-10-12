@@ -68,7 +68,7 @@ class SettingsTest(SettingsTestCase):
 
     def test_defaults_before_first_save(self):
         user = self.service.get_user(self.user_id)
-        self.assertEqual((user.warning_days, user.theme), (30, "light"))
+        self.assertEqual((user.warning_days, user.theme), (30, "system"))
         self.assertTrue(user.notify_expired and user.notify_low_stock)
 
     def test_bad_warning_days(self):
@@ -109,7 +109,7 @@ class SettingsTest(SettingsTestCase):
         other_id = self.add_user("boris")
         self.save(warning_days="5", theme="dark")
         other = self.service.get_user(other_id)
-        self.assertEqual((other.warning_days, other.theme), (30, "light"))
+        self.assertEqual((other.warning_days, other.theme), (30, "system"))
 
 
 class LoginChangeTest(SettingsTestCase):

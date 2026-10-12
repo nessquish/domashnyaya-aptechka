@@ -472,8 +472,9 @@ class NavigationTest(AppTestCase):
         self.assertIsNone(self.app.user)
         self.assertEqual(theme.theme_name(), "light")
 
-    def test_user_theme_is_applied_on_sign_in(self):
-        self.db.execute("UPDATE users SET theme = 'dark'")
+    def test_chosen_theme_is_applied_on_sign_in(self):
+        # Тема — настройка устройства: хранится в предпочтениях, а не в аккаунте.
+        self.app.preferences.set(0, "theme_mode", "dark")
         self.sign_in()
         self.assertEqual(theme.theme_name(), "dark")
 
