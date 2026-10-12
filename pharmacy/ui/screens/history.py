@@ -138,6 +138,7 @@ class HistoryScreen(QWidget):
             pass
 
     def _reload(self) -> None:
+        QTimer.singleShot(40, self.fit_rows)  # после того, как строки покажутся
         self._events: List[QWidget] = []
         self._titles: List[str] = []
         self.setUpdatesEnabled(False)

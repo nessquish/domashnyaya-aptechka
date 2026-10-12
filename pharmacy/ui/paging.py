@@ -65,7 +65,7 @@ def fitted_rows(
     return rows
 
 
-MIN_SCROLL_HEIGHT = 120
+MIN_SCROLL_HEIGHT = 40
 
 
 def fit_scroll(
@@ -90,5 +90,8 @@ def fit_scroll(
     top = scroll.mapTo(screen, QPoint(0, 0)).y()
     below = card.mapTo(screen, QPoint(0, card.height())).y() - (top + scroll.height())
     available = viewport_height - top - below - BOTTOM_GAP
-    content = scroll.widget().sizeHint().height()
+    host = scroll.widget()
+    host.layout().invalidate()
+    host.layout().activate()  # новые строки ещё могут быть «скрыты»: пересчитываем
+    content = host.sizeHint().height()
     scroll.setFixedHeight(max(min(content, available), MIN_SCROLL_HEIGHT))

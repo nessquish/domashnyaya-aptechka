@@ -160,3 +160,47 @@ class ListsScrollInsideTheCardTest(ShellTestCase):
         page = self.open(sections.SHOPPING)
         self.assertTrue(page.summary.text().startswith("Показано"))
         self.assertTrue(hasattr(page, "pagination"))
+
+
+class ListShrinksWithItsContentTest(ShellTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        paging.AUTO_FIT = True
+        self.addCleanup(setattr, paging, "AUTO_FIT", False)
+        self.app.resize(1160, 900)
+        self.settle()
+
+    def pause(self):
+        import time
+
+        time.sleep(0.12)
+        self.settle()
+        self.settle()
+
+    def test_notifications_get_smaller_when_there_are_fewer(self):
+        page = self.open(sections.NOTIFICATIONS)
+        self.pause()
+        full = page._scroll.height()
+        page._on_tab(3)  # только «Срок годности»: уведомлений меньше
+        self.pause()
+        self.assertLess(page._scroll.height(), full)
+        self.assertEqual(
+            page._scroll.height(), page._scroll.widget().sizeHint().height()
+        )
+
+    def test_history_gets_smaller_with_a_search(self):
+        page = self.open(sections.HISTORY)
+        self.pause()
+        full = page._scroll.height()
+        page._query = "ибупрофен"
+        page._reload()
+        self.pause()
+        self.assertLess(page._scroll.height(), full)
+
+    def test_one_item_makes_a_small_table(self):
+        page = self.open(sections.NOTIFICATIONS)
+        for number in range(1, 9):
+            self.services.notifications.delete(self.app.user.id, number)
+        page._reload()
+        self.pause()
+        self.assertLess(page._card.height(), 200)

@@ -207,6 +207,7 @@ class NotificationsScreen(QWidget):
 
     def _reload(self) -> None:
         """Перерисовывает вкладки и список и обновляет счётчик в меню."""
+        QTimer.singleShot(40, self.fit_rows)  # после того, как строки покажутся
         self.setUpdatesEnabled(False)
         try:
             self._tabs.set_items(self._tab_labels())
