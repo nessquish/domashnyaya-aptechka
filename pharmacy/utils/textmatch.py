@@ -25,6 +25,8 @@ def _same_word(query_word: str, word: str) -> bool:
         return True
     if len(word) >= MIN_STEM and query_word.startswith(word):
         return True
+    if len(query_word) >= 5 and query_word[:-2] in word:
+        return True  # основа слова внутри другого: «витамины» в «поливитаминный»
     common = 0
     for first, second in zip(query_word, word):
         if first != second:

@@ -15,6 +15,7 @@ class TextMatchTest(ShellTestCase):
         self.assertTrue(name_matches("Ибупрофен", "ибу"))
         self.assertTrue(name_matches("Средство для посуды", "посуда"))
         self.assertTrue(name_matches("Ёлочная гирлянда", "елочная"))
+        self.assertTrue(name_matches("Комплексный поливитаминный препарат", "витамины"))
 
     def test_unrelated_words_do_not_match(self):
         self.assertFalse(name_matches("Бинт", "бантик"))
