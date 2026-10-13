@@ -250,11 +250,10 @@ class PopupList(QWidget):
         На поле нажатие не закрывает список: поле само решает, закрыть его или
         открыть заново.
         """
-        for widget in (self, self._anchor):
-            area = QRect(widget.mapToGlobal(QPoint(0, 0)), widget.size())
-            if area.contains(point):
-                return True
-        return False
+        return any(
+            QRect(widget.mapToGlobal(QPoint(0, 0)), widget.size()).contains(point)
+            for widget in (self, self._anchor)
+        )
 
     def close_list(self) -> None:
         """Закрывает список."""

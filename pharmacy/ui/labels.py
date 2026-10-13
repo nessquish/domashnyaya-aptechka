@@ -72,8 +72,4 @@ def short_category(name: str) -> str:
 
 def greeting(hour: int) -> str:
     """Возвращает приветствие по часу суток (0-23)."""
-    text = _GREETINGS[0][1]
-    for start, phrase in _GREETINGS:
-        if hour >= start:
-            text = phrase
-    return text
+    return next(phrase for start, phrase in reversed(_GREETINGS) if hour >= start)

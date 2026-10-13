@@ -147,12 +147,8 @@ class _AuthScreen(QWidget):
         box.setFixedWidth(FORM_WIDTH)
         card.body.addWidget(box)
         self._form = QVBoxLayout(box)
-        self._form.setContentsMargins(
-            FORM_PADDING_X - SHADOW_PAD,
-            padding_y,
-            FORM_PADDING_X - SHADOW_PAD,
-            padding_y,
-        )
+        side = FORM_PADDING_X - SHADOW_PAD
+        self._form.setContentsMargins(side, padding_y, side, padding_y)
         self._form.setSpacing(0)
         brand_gap, title_gap, subtitle_gap = header_gaps
         self._header("Моя аптечка", "brand", "primary", brand_gap)
@@ -269,8 +265,9 @@ class LoginScreen(_AuthScreen):
             self._show_banner(str(error))
             # Красным только то поле, где ошибка: если аккаунт найден, а пароль
             # неверный, логин или почту не трогаем.
-            self._fields[error.field or "password"].set_error()
-            self._fields[error.field or "password"].focus_field()
+            field = self._fields[error.field or "password"]
+            field.set_error()
+            field.focus_field()
         else:
             self._app.sign_in(user, password, self._remember.value)
 
@@ -291,44 +288,18 @@ class RegisterScreen(_AuthScreen):
             padding_y=24,
             header_gaps=(12, 6, 14),
         )
-        gap = 5
-        self._add_field(
-            "username",
-            TextField("Имя пользователя", placeholder="Введите имя"),
-            gap,
-        )
-        self._add_field(
-            "login",
-            TextField("Логин", placeholder="Введите логин", required=True),
-            gap,
-        )
-        self._add_field(
-            "email",
-            TextField(
-                "Электронная почта", placeholder="example@mail.ru", required=True
-            ),
-            gap,
-        )
-        self._add_field(
-            "password",
-            TextField(
-                "Пароль",
-                placeholder="Не менее 8 символов",
-                required=True,
-                password=True,
-            ),
-            gap,
-        )
-        self._add_field(
-            "password_repeat",
-            TextField(
-                "Повторите пароль",
-                placeholder="Повторите пароль",
-                required=True,
-                password=True,
-            ),
-            gap,
-        )
+        # Поле: ключ, подпись, подсказка, обязательное ли, скрывать ли текст.
+        for key, caption, hint, required, secret in (
+            ("username", "Имя пользователя", "Введите имя", False, False),
+            ("login", "Логин", "Введите логин", True, False),
+            ("email", "Электронная почта", "example@mail.ru", True, False),
+            ("password", "Пароль", "Не менее 8 символов", True, True),
+            ("password_repeat", "Повторите пароль", "Повторите пароль", True, True),
+        ):
+            field = TextField(
+                caption, placeholder=hint, required=required, password=secret
+            )
+            self._add_field(key, field, 5)
         self._add_footer(
             "Зарегистрироваться", "Уже есть аккаунт?", "Войти", app.show_login
         )

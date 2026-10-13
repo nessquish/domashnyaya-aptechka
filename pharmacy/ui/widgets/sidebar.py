@@ -17,7 +17,7 @@ from pharmacy.models import User
 from pharmacy.ui.fonts import font, line_height, text_width
 from pharmacy.ui.icons import icon_pixmap
 from pharmacy.ui.paint import Shadow, begin, draw_shadows, fill_rounded, qcolor
-from pharmacy.ui.widgets.common import clickable, label
+from pharmacy.ui.widgets.common import Line, clickable, label
 from pharmacy.ui.widgets.iconbutton import IconButton
 from pharmacy.ui import theme
 from pharmacy.ui.theme import mix, palette
@@ -184,17 +184,6 @@ class _FooterLink(QAbstractButton):
         )
 
 
-class _Line(QWidget):
-    """Тонкая горизонтальная линия."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.setFixedHeight(1)
-
-    def paintEvent(self, _event) -> None:
-        QPainter(self).fillRect(self.rect(), palette().line)
-
-
 class Sidebar(QFrame):
     """Левая панель: название, разделы, пользователь и кнопка выхода."""
 
@@ -289,10 +278,9 @@ class Sidebar(QFrame):
         on_profile: Optional[Callable[[], None]] = None,
     ) -> None:
         pal = palette()
-        line = _Line()
         line_row = QHBoxLayout()
         line_row.setContentsMargins(NAV_PAD, 0, NAV_PAD, 0)
-        line_row.addWidget(line)
+        line_row.addWidget(Line("line"))
         outer.addLayout(line_row)
 
         # Нажатие на аватар и имя открывает профиль пользователя.

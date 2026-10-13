@@ -1,5 +1,6 @@
 """Тесты экранов товаров: список, форма, карточка."""
 
+import unittest
 from typing import List
 
 from PySide6.QtCore import Qt
@@ -419,3 +420,25 @@ class ProductCardTest(KitTestCase):
         self.assertEqual(_days_phrase(1), "через 1 день")
         self.assertEqual(_days_phrase(0), "истекает сегодня")
         self.assertEqual(_days_phrase(-3), "просрочено на 3 дня")
+
+
+class PaginationWindowTest(unittest.TestCase):
+    def pages(self, page, total):
+        from pharmacy.ui.widgets.controls import Pagination
+        from tests.qt_helpers import runtime
+
+        runtime.application()
+        return list(Pagination(page, total, lambda _p: None).visible_pages())
+
+    def test_at_most_five_numbers_with_the_current_in_the_middle(self):
+        self.assertEqual(self.pages(1, 8), [1, 2, 3, 4, 5])
+        self.assertEqual(self.pages(3, 8), [1, 2, 3, 4, 5])
+        self.assertEqual(self.pages(4, 8), [2, 3, 4, 5, 6])
+        self.assertEqual(self.pages(5, 8), [3, 4, 5, 6, 7])
+        self.assertEqual(self.pages(7, 8), [4, 5, 6, 7, 8])
+        self.assertEqual(self.pages(8, 8), [4, 5, 6, 7, 8])
+
+    def test_few_pages_are_all_shown(self):
+        self.assertEqual(self.pages(1, 1), [1])
+        self.assertEqual(self.pages(2, 3), [1, 2, 3])
+        self.assertEqual(self.pages(5, 5), [1, 2, 3, 4, 5])

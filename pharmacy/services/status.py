@@ -109,7 +109,4 @@ def primary_status(statuses: List[ProductStatus]) -> ProductStatus:
     Returns:
         Самое важное состояние по порядку STATUS_PRIORITY.
     """
-    for status in STATUS_PRIORITY:
-        if status in statuses:
-            return status
-    return ProductStatus.OK
+    return next((s for s in STATUS_PRIORITY if s in statuses), ProductStatus.OK)

@@ -88,17 +88,11 @@ def _draw_shadow(
     Тень собирается из нескольких слоёв с растущим размером: края получаются
     плавными, как у размытия, но без дорогого расчёта.
     """
-    opacity, offset, blur, color = (
-        shadow.opacity,
-        shadow.dy,
-        shadow.blur,
-        shadow.color,
-    )
-    sigma = blur / 2  # как в CSS: размытие в 2 раза шире σ гауссианы
-    layer_opacity = 1 - (1 - opacity) ** (1 / SHADOW_LAYERS)
+    sigma = shadow.blur / 2  # как в CSS: размытие в 2 раза шире σ гауссианы
+    layer_opacity = 1 - (1 - shadow.opacity) ** (1 / SHADOW_LAYERS)
     painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(qcolor(color, layer_opacity))
-    shifted = rect.translated(0, offset)
+    painter.setBrush(qcolor(shadow.color, layer_opacity))
+    shifted = rect.translated(0, shadow.dy)
     for quantile in _QUANTILES:
         grow = sigma * quantile
         box = shifted.adjusted(-grow, -grow, grow, grow)

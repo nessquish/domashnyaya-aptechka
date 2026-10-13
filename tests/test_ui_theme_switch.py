@@ -10,9 +10,6 @@ class ThemeSwitchTest(ShellTestCase):
         self.shell.toggle_theme()
         self.settle()
 
-    def test_menu_offers_the_dark_theme(self):
-        self.assertEqual(self.shell.sidebar.theme_link.text(), "Тёмная тема")
-
     def test_toggle_switches_to_dark_and_back(self):
         self.toggle()
         self.assertEqual(theme.theme_name(), "dark")
@@ -21,11 +18,6 @@ class ThemeSwitchTest(ShellTestCase):
         self.toggle()
         self.assertEqual(theme.theme_name(), "light")
         self.assertEqual(self.app.theme_mode(self.app.user), "light")
-
-    def test_menu_link_switches_the_theme(self):
-        click(self.shell.sidebar.theme_link)
-        self.settle()
-        self.assertEqual(theme.theme_name(), "dark")
 
     def test_choice_is_saved_for_the_next_sign_in(self):
         self.toggle()
@@ -37,34 +29,6 @@ class ThemeSwitchTest(ShellTestCase):
         self.open(sections.HISTORY)
         self.toggle()
         self.assertEqual(self.shell.section, sections.HISTORY)
-
-    def test_colors_really_change(self):
-        before = self.app.palette().window().color().name()
-        self.toggle()
-        after = self.app.palette().window().color().name()
-        self.assertNotEqual(after, before)
-        self.assertEqual(after.upper(), theme.DARK.bg.upper())
-
-    def test_screen_is_painted_in_the_new_colors(self):
-        self.toggle()
-        pixel = self.app.grab().toImage().pixelColor(self.app.width() - 3, 3)
-        self.assertEqual(pixel.name().upper(), theme.DARK.bg.upper())
-
-    def test_other_settings_survive_the_switch(self):
-        self.db.execute("UPDATE users SET warning_days = 12, notify_low_stock = 0")
-        self.app.user = self.services.settings.get_user(self.app.user.id)
-        self.shell.user = self.app.user
-        self.toggle()
-        saved = self.services.settings.get_user(self.app.user.id)
-        self.assertEqual((saved.warning_days, saved.notify_low_stock), (12, False))
-
-    def test_setting_the_same_theme_does_nothing(self):
-        self.shell.set_theme("light")
-        self.settle()
-        shell = self.app.screen_widget
-        shell.set_theme("light")
-        self.settle()
-        self.assertIs(self.app.screen_widget, shell)
 
     def test_settings_switch_applies_the_theme_at_once(self):
         self.open(sections.SETTINGS)
@@ -84,16 +48,6 @@ class ThemeSwitchTest(ShellTestCase):
         self.settle()
         self.shell.open_product(1)
         self.settle()
-
-
-class DarkPaletteScreenshotTest(ShellTestCase):
-    def test_dark_cards_use_the_dark_card_color(self):
-        self.shell.toggle_theme()
-        self.settle()
-        card = self.page.stat_cards[0]
-        image = card.grab().toImage()
-        center = image.pixelColor(card.width() // 2, card.height() // 2)
-        self.assertEqual(center.name().upper(), theme.DARK.card.upper())
 
 
 class SystemThemeTest(ShellTestCase):

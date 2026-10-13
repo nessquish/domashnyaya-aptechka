@@ -1,6 +1,5 @@
 """Карточка товара (макет Figma, экраны 06 и 08): окно поверх текущего экрана."""
 
-from datetime import datetime
 from typing import TYPE_CHECKING, List, Tuple
 
 from PySide6.QtCore import Qt
@@ -18,7 +17,7 @@ from pharmacy.ui.widgets.common import Line, label, pad
 from pharmacy.ui.widgets.dialog import Dialog, Modal
 from pharmacy.ui.widgets.iconbox import IconBox
 from pharmacy.ui.widgets.iconbutton import IconButton
-from pharmacy.utils.dates import format_user_date
+from pharmacy.utils.dates import format_created, format_user_date
 from pharmacy.utils.formatting import format_quantity, plural
 
 if TYPE_CHECKING:
@@ -93,16 +92,10 @@ class ProductCardDialog(Modal):
         names.setSpacing(0)
         self.title = label(product.name, "product_title", tight=True)
         names.addWidget(self.title)
-        added = datetime.strptime(product.created_at[:10], "%Y-%m-%d").date()
         names.addSpacing(2)
-        names.addWidget(
-            label(
-                f"{product.category_name} · добавлен {format_user_date(added)}",
-                "small",
-                "ink_3",
-                tight=True,
-            )
-        )
+        added = format_created(product.created_at)
+        text = f"{product.category_name} · добавлен {added}"
+        names.addWidget(label(text, "small", "ink_3", tight=True))
         row.addLayout(names)
         row.addStretch(1)
         for status in self.view.statuses:
@@ -117,9 +110,7 @@ class ProductCardDialog(Modal):
         """Пары «название поля, значение, цвет значения» для таблицы данных."""
         product = self.view.product
         unit = product.unit
-        expiry = NO_DATA
-        if product.expiry_date is not None:
-            expiry = format_user_date(product.expiry_date)
+        expiry = format_user_date(product.expiry_date) or NO_DATA
         return [
             ("Количество", f"{format_quantity(product.quantity)} {unit}", "ink"),
             (

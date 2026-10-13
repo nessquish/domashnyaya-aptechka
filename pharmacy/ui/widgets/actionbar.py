@@ -63,18 +63,18 @@ class ActionBar(QWidget):
     def flash(self, text: str, on_done, ms: int = 2500) -> None:
         """Показывает короткое сообщение вместо кнопок и потом вызывает ``on_done``."""
         self.show_bar(text)
+        self._show_buttons(False)
+        QTimer.singleShot(ms, lambda: self._unflash(on_done))
+
+    def _show_buttons(self, visible: bool) -> None:
         for index in range(self.buttons.count()):
             widget = self.buttons.itemAt(index).widget()
             if widget is not None:
-                widget.setVisible(False)
-        QTimer.singleShot(ms, lambda: self._unflash(on_done))
+                widget.setVisible(visible)
 
     def _unflash(self, on_done) -> None:
         try:
-            for index in range(self.buttons.count()):
-                widget = self.buttons.itemAt(index).widget()
-                if widget is not None:
-                    widget.setVisible(True)
+            self._show_buttons(True)
             on_done()
         except RuntimeError:  # экран уже закрыт
             pass

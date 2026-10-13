@@ -9,9 +9,9 @@
 ``nessquish`` (пароль ``demo12345``) со всеми видами данных, а данные лежат
 отдельно в ``%LOCALAPPDATA%\\Моя аптечка (демо)``.
 
-Обычная сборка: Файл можно скопировать на другой компьютер с
-Windows: Python на нём не нужен. Данные программы (база и настройки) хранятся
-в ``%LOCALAPPDATA%\\Моя аптечка`` и сохраняются между запусками.
+Готовый файл можно копировать на другой компьютер с Windows: Python там не
+нужен. Данные программы (база и настройки) лежат в ``%LOCALAPPDATA%\\Моя аптечка``
+и сохраняются между запусками.
 """
 
 import io
@@ -31,6 +31,7 @@ BUILD_DIR = ROOT / "build"
 ICON_FILE = BUILD_DIR / "aptechka.ico"
 ENTRY = ROOT / "packaging" / "launcher.py"
 FONTS = ROOT / "pharmacy" / "ui" / "assets" / "fonts"
+ASSETS = ROOT / "pharmacy" / "assets"
 EXE_NAME = "Aptechka"
 DEMO_FLAG_FILE = BUILD_DIR / "demo.flag"
 
@@ -73,6 +74,9 @@ def build(demo: bool = False) -> None:
             # Шрифт Inter читается из файлов, поэтому кладём их внутрь программы.
             "--add-data",
             f"{FONTS};pharmacy/ui/assets/fonts",
+            # Шаблон Excel для импорта лежит в файле, поэтому тоже кладём внутрь.
+            "--add-data",
+            f"{ASSETS};pharmacy/assets",
             "--paths",
             str(ROOT),
             "--distpath",

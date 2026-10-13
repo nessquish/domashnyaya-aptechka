@@ -1,6 +1,6 @@
 """Форма товара: окно добавления и редактирования (макет Figma, экраны 05 и 07)."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import Callable, Dict, Optional
 
 from PySide6.QtCore import Qt
@@ -15,7 +15,7 @@ from pharmacy.ui.widgets.common import label
 from pharmacy.ui.widgets.dialog import Modal
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.select import Select
-from pharmacy.utils.dates import format_user_date
+from pharmacy.utils.dates import format_created, format_user_date
 from pharmacy.utils.formatting import format_quantity
 from pharmacy.utils.units import DEFAULT_UNIT, UNITS
 
@@ -147,11 +147,9 @@ class ProductFormDialog(Modal):
         Raises:
             NotFoundError: Если редактируемого товара нет.
         """
-        existing = (
-            services.products.get_product(user_id, product_id)
-            if product_id is not None
-            else None
-        )
+        existing = None
+        if product_id is not None:
+            existing = services.products.get_product(user_id, product_id)
         super().__init__(host, DIALOG_WIDTH, on_enter=self._submit)
         self._services = services
         self._user_id = user_id
@@ -174,19 +172,20 @@ class ProductFormDialog(Modal):
 
     def _fill(self, view: ProductView) -> None:
         product = view.product
-        self.fields["name"].set(product.name)
-        self.fields["category_id"].set(product.category_id)
-        self.fields["quantity"].set(format_quantity(product.quantity))
-        self.fields["unit"].set(product.unit)
-        self.fields["expiry_date"].set(
-            format_user_date(product.expiry_date) if product.expiry_date else ""
-        )
-        self.fields["storage_place"].set(product.storage_place)
-        self.fields["min_quantity"].set(format_quantity(product.min_quantity))
-        self.fields["indications"].set(product.indications)
-        self.fields["note"].set(product.note)
-        added = datetime.strptime(product.created_at[:10], "%Y-%m-%d").date()
-        self.added_field.set(format_user_date(added))
+        values = {
+            "name": product.name,
+            "category_id": product.category_id,
+            "quantity": format_quantity(product.quantity),
+            "unit": product.unit,
+            "expiry_date": format_user_date(product.expiry_date),
+            "storage_place": product.storage_place,
+            "min_quantity": format_quantity(product.min_quantity),
+            "indications": product.indications,
+            "note": product.note,
+        }
+        for key, value in values.items():
+            self.fields[key].set(value)
+        self.added_field.set(format_created(product.created_at))
         show_units(self.fields)
 
     def read_form(self) -> ProductForm:
@@ -258,13 +257,12 @@ class ProductFormDialog(Modal):
     def _submit(self) -> None:
         for widget in self.fields.values():
             widget.clear_error()
+        products = self._services.products
         try:
             if self._product_id is None:
-                view = self._services.products.add_product(
-                    self._user_id, self.read_form()
-                )
+                view = products.add_product(self._user_id, self.read_form())
             else:
-                view = self._services.products.update_product(
+                view = products.update_product(
                     self._user_id, self._product_id, self.read_form()
                 )
         except ValidationError as error:

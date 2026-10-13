@@ -1,7 +1,6 @@
 """Экран «Список покупок» (макет Figma, экраны 09 и 10)."""
 
 import math
-from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 from PySide6.QtCore import QTimer
@@ -9,22 +8,23 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from pharmacy.errors import ValidationError
 from pharmacy.models import ShoppingItem, ShoppingSource
-from pharmacy.ui.widgets.actionbar import HEIGHT as BAR_HEIGHT, ActionBar
+from pharmacy.ui.screens.tablescreen import PagedTableScreen
+from pharmacy.ui.widgets.actionbar import ActionBar
 from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
 from pharmacy.ui.widgets.combo import ComboField
-from pharmacy.ui.widgets.common import Line, clear_layout, label
-from pharmacy.ui.widgets.controls import Checkbox, Pagination, Segmented
+from pharmacy.ui.widgets.controls import Checkbox, Segmented
+from pharmacy.ui.widgets.footer import fill_footer
 from pharmacy.ui.widgets.dialog import Modal
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.page import PageHeader
 from pharmacy.ui.widgets.popup import PopupList
 from pharmacy.ui.widgets.select import Select
 from pharmacy.ui.widgets.table import Column, DataTable, TextCell
-from pharmacy.ui.paging import fitted_rows, remembered_rows
+from pharmacy.ui.paging import remembered_rows
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
-from pharmacy.utils.dates import format_user_date
+from pharmacy.utils.dates import format_created
 from pharmacy.utils.formatting import format_quantity
 from pharmacy.utils.textmatch import name_matches
 from pharmacy.utils.units import DEFAULT_UNIT, UNITS
@@ -39,6 +39,7 @@ SOURCE_LABELS = {
     ShoppingSource.KIT: "Моя аптечка",
     ShoppingSource.CARD: "Карточка товара",
     ShoppingSource.HOME: "Главная",
+    ShoppingSource.IMPORT: "Импортировано",
 }
 COLUMNS = (
     Column("", fixed=44),
@@ -56,7 +57,7 @@ FLASH_MS = 4000  # сколько держится подсветка найде
 
 def _created(item: ShoppingItem) -> str:
     """Дата добавления позиции в формате ДД.ММ.ГГГГ."""
-    return format_user_date(datetime.strptime(item.created_at[:10], "%Y-%m-%d").date())
+    return format_created(item.created_at)
 
 
 def _caption(product) -> str:
@@ -64,8 +65,10 @@ def _caption(product) -> str:
     return f"{product.name} · {format_quantity(product.quantity)} {product.unit}"
 
 
-class ShoppingScreen(QWidget):
+class ShoppingScreen(PagedTableScreen):
     """Таблица позиций с фильтрами-вкладками, выбором строк и действиями над ними."""
+
+    PAGING_KEY = PAGING_KEY
 
     def __init__(self, shell: "MainShell", tab: int = 0) -> None:
         """Создаёт экран.
@@ -204,7 +207,15 @@ class ShoppingScreen(QWidget):
                     item.id in self._selected or item.id == self._flash_id,
                     on_click=lambda i=item.id: self._flip(i),
                 )
-            self._build_footer(len(found), start, pages)
+            self.summary, self.pagination = fill_footer(
+                self._footer,
+                self._page,
+                pages,
+                len(found),
+                start,
+                len(self._visible),
+                self._on_page,
+            )
             self._update_bar()
         finally:
             self.setUpdatesEnabled(True)
@@ -239,25 +250,6 @@ class ShoppingScreen(QWidget):
             ),
         ]
 
-    def _build_footer(self, total: int, start: int, pages: int) -> None:
-        """Строка «Показано …» и переключатель страниц."""
-        clear_layout(self._footer)
-        self._footer.addWidget(Line("line"))
-        row = QHBoxLayout()
-        row.setContentsMargins(14, 10, 14, 10)
-        shown = len(self._visible)
-        text = (
-            f"Показано {start + 1}–{start + shown} из {total}"
-            if shown
-            else "Показано 0 из 0"
-        )
-        self.summary = label(text, "small", "ink_2")
-        row.addWidget(self.summary)
-        row.addStretch(1)
-        self.pagination = Pagination(self._page, pages, self._on_page)
-        row.addWidget(self.pagination)
-        self._footer.addLayout(row)
-
     def reveal(self, item_id: int) -> None:
         """Показывает страницу, где стоит позиция, и подсвечивает её на пару секунд."""
         self._filter = 0
@@ -280,36 +272,6 @@ class ShoppingScreen(QWidget):
         except RuntimeError:  # экран уже закрыт
             pass
 
-    def _on_page(self, page: int) -> None:
-        self._page = page
-        self._reload()
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        QTimer.singleShot(0, self.fit_rows)
-
-    def fit_rows(self) -> None:
-        """Подгоняет число строк на странице под высоту окна."""
-        if not hasattr(self, "_footer"):
-            return
-        size = fitted_rows(
-            PAGING_KEY,
-            self,
-            self._card,
-            self._table,
-            self._table.header_height,
-            self._table.row_count,
-            self._page_size,
-            self._shell.viewport_height(),
-            0 if self._bar.isVisible() else BAR_HEIGHT,
-        )
-        if size != self._page_size:
-            first = (self._page - 1) * self._page_size
-            self._page_size = size
-            self._page = first // size + 1
-            self._reload()
-            QTimer.singleShot(0, self.fit_rows)
-
     def _update_bar(self) -> None:
         """Показывает панель действий, пока выбрана хотя бы одна строка."""
         count = len(self._selected)
@@ -322,8 +284,7 @@ class ShoppingScreen(QWidget):
             self._bar.hide_bar()
         self.all_button.setVisible(count < len(self._found))
         self._show_bought_action()
-        everything = bool(self._visible) and count == len(self._visible)
-        self._select_all.set(everything)
+        self._select_all.set(bool(self._visible) and count == len(self._visible))
 
     def _show_bought_action(self) -> None:
         """Если все выбранные уже куплены, кнопка возвращает их в список."""

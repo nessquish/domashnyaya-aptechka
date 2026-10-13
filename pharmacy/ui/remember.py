@@ -22,7 +22,12 @@ def fingerprint(password_hash: str) -> str:
 class RememberedLogin:
     """Одна запись «Запомнить это устройство». Без пути хранится только в памяти."""
 
-    def __init__(self, path: Optional[Union[str, Path]] = None) -> None:
+    def __init__(
+        self,
+        path: Optional[Union[str, Path]] = None,
+        lifetime: timedelta = timedelta(days=REMEMBER_DAYS),
+    ) -> None:
+        self._lifetime = lifetime
         self._path = Path(path) if path is not None else None
         self._data: dict = {}
         if self._path is not None and self._path.is_file():
@@ -36,12 +41,12 @@ class RememberedLogin:
     def remember(
         self, user_id: int, password_hash: str, now: Optional[datetime] = None
     ) -> None:
-        """Запоминает пользователя на ``REMEMBER_DAYS`` дней."""
+        """Запоминает пользователя на срок жизни записи (по умолчанию 30 дней)."""
         now = now or datetime.now()
         self._data = {
             "user_id": user_id,
             "fingerprint": fingerprint(password_hash),
-            "expires": (now + timedelta(days=REMEMBER_DAYS)).isoformat(),
+            "expires": (now + self._lifetime).isoformat(),
         }
         self._save()
 

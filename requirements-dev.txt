@@ -3,5 +3,7 @@ black
 flake8
 pre-commit
 pyinstaller
+# coverage.py измеряет покрытие кода тестами
+coverage
 # Pillow собирает многоразмерный значок .ico при сборке Aptechka.exe
 Pillow>=10.0

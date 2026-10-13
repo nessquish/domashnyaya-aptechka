@@ -1,7 +1,8 @@
 """Мягкое сравнение названий для поиска: без учёта регистра, ё и окончаний."""
 
 import re
-from typing import List
+from os.path import commonprefix
+from typing import Callable, List, TypeVar
 
 _WORD = re.compile(r"\w+", re.UNICODE)
 MIN_STEM = 3  # слово короче этого не считается началом более длинного запроса
@@ -27,12 +28,18 @@ def _same_word(query_word: str, word: str) -> bool:
         return True
     if len(query_word) >= 5 and query_word[:-2] in word:
         return True  # основа слова внутри другого: «витамины» в «поливитаминный»
-    common = 0
-    for first, second in zip(query_word, word):
-        if first != second:
-            break
-        common += 1
+    common = len(commonprefix([query_word, word]))
     return common >= max(MIN_COMMON, min(len(query_word), len(word)) - 2)
+
+
+T = TypeVar("T")
+
+
+def find_matching(
+    items: List[T], text_of: Callable[[T], str], query: str, limit: int
+) -> List[T]:
+    """Первые ``limit`` элементов, текст которых подходит под запрос."""
+    return [item for item in items if name_matches(text_of(item), query)][:limit]
 
 
 def name_matches(text: str, query: str) -> bool:

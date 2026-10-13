@@ -19,7 +19,7 @@ from pharmacy.repositories.user_repository import UserRepository
 from pharmacy.services.status import ProductStatus, product_statuses
 from pharmacy.utils.dates import days_until, format_user_date
 from pharmacy.utils.formatting import format_quantity, plural
-from pharmacy.utils.textmatch import name_matches
+from pharmacy.utils.textmatch import find_matching
 
 # Подписи видов уведомлений для заголовка и фильтра в интерфейсе.
 KIND_LABELS = {
@@ -187,12 +187,8 @@ class NotificationService:
 
     def search(self, user_id: int, query: str, limit: int = 10) -> List[Notification]:
         """Ищет уведомления по тексту (название товара есть в каждом)."""
-        found = [
-            item
-            for item in self._notifications.list_for_user(user_id)
-            if name_matches(item.message, query)
-        ]
-        return found[:limit]
+        items = self._notifications.list_for_user(user_id)
+        return find_matching(items, lambda item: item.message, query, limit)
 
     def count_unread(self, user_id: int) -> int:
         """Возвращает число непрочитанных (для счётчика в боковом меню)."""

@@ -44,13 +44,12 @@ class NotificationRepository(BaseRepository):
         Returns:
             Идентификатор нового уведомления.
         """
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "INSERT INTO notifications (user_id, product_id, kind, message)"
-                " VALUES (?, ?, ?, ?)",
-                (user_id, product_id, kind, message),
-            )
-            return cursor.lastrowid
+        return self._insert(
+            "INSERT INTO notifications (user_id, product_id, kind, message)"
+            " VALUES (?, ?, ?, ?)",
+            (user_id, product_id, kind, message),
+            conn,
+        )
 
     def get(self, user_id: int, notification_id: int) -> Optional[Notification]:
         """Находит уведомление пользователя (None, если нет или оно чужое)."""
@@ -107,20 +106,18 @@ class NotificationRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> None:
         """Обновляет текст уведомления (например, при изменении количества)."""
-        with self._connection(conn) as c:
-            c.execute(
-                "UPDATE notifications SET message = ? WHERE id = ?",
-                (message, notification_id),
-            )
+        self._change(
+            "UPDATE notifications SET message = ? WHERE id = ?",
+            (message, notification_id),
+            conn,
+        )
 
     def mark_read(self, user_id: int, notification_id: int) -> bool:
         """Отмечает уведомление прочитанным. Возвращает True, если оно найдено."""
-        with self._connection() as c:
-            cursor = c.execute(
-                "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
-                (notification_id, user_id),
-            )
-            return cursor.rowcount > 0
+        return 0 < self._change(
+            "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
+            (notification_id, user_id),
+        )
 
     def mark_all_read(self, user_id: int) -> int:
         """Отмечает все уведомления пользователя прочитанными.
@@ -128,13 +125,10 @@ class NotificationRepository(BaseRepository):
         Returns:
             Сколько уведомлений изменилось.
         """
-        with self._connection() as c:
-            cursor = c.execute(
-                "UPDATE notifications SET is_read = 1"
-                " WHERE user_id = ? AND is_read = 0",
-                (user_id,),
-            )
-            return cursor.rowcount
+        return self._change(
+            "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0",
+            (user_id,),
+        )
 
     def delete(
         self,
@@ -143,17 +137,12 @@ class NotificationRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> bool:
         """Удаляет уведомление пользователя. Возвращает True, если оно найдено."""
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "DELETE FROM notifications WHERE id = ? AND user_id = ?",
-                (notification_id, user_id),
-            )
-            return cursor.rowcount > 0
+        return 0 < self._change(
+            "DELETE FROM notifications WHERE id = ? AND user_id = ?",
+            (notification_id, user_id),
+            conn,
+        )
 
     def delete_all(self, user_id: int) -> int:
         """Удаляет все уведомления пользователя и возвращает их число."""
-        with self._connection() as c:
-            cursor = c.execute(
-                "DELETE FROM notifications WHERE user_id = ?", (user_id,)
-            )
-            return cursor.rowcount
+        return self._change("DELETE FROM notifications WHERE user_id = ?", (user_id,))

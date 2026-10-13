@@ -49,14 +49,13 @@ class ShoppingRepository(BaseRepository):
         Returns:
             Идентификатор новой позиции.
         """
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "INSERT INTO shopping_list"
-                " (user_id, product_id, name, quantity, unit, source)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (user_id, product_id, name, quantity, unit, source),
-            )
-            return cursor.lastrowid
+        return self._insert(
+            "INSERT INTO shopping_list"
+            " (user_id, product_id, name, quantity, unit, source)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, product_id, name, quantity, unit, source),
+            conn,
+        )
 
     def update_quantity(
         self,
@@ -66,11 +65,11 @@ class ShoppingRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> None:
         """Меняет, сколько нужно купить."""
-        with self._connection(conn) as c:
-            c.execute(
-                "UPDATE shopping_list SET quantity = ? WHERE id = ? AND user_id = ?",
-                (quantity, item_id, user_id),
-            )
+        self._change(
+            "UPDATE shopping_list SET quantity = ? WHERE id = ? AND user_id = ?",
+            (quantity, item_id, user_id),
+            conn,
+        )
 
     def get(self, user_id: int, item_id: int) -> Optional[ShoppingItem]:
         """Находит позицию пользователя (None, если нет или она чужая)."""
@@ -117,12 +116,11 @@ class ShoppingRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> bool:
         """Меняет отметку «куплено». Возвращает True, если позиция найдена."""
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "UPDATE shopping_list SET is_bought = ? WHERE id = ? AND user_id = ?",
-                (int(is_bought), item_id, user_id),
-            )
-            return cursor.rowcount > 0
+        return 0 < self._change(
+            "UPDATE shopping_list SET is_bought = ? WHERE id = ? AND user_id = ?",
+            (int(is_bought), item_id, user_id),
+            conn,
+        )
 
     def delete(
         self,
@@ -131,18 +129,15 @@ class ShoppingRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> bool:
         """Удаляет позицию. Возвращает True, если она найдена."""
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "DELETE FROM shopping_list WHERE id = ? AND user_id = ?",
-                (item_id, user_id),
-            )
-            return cursor.rowcount > 0
+        return 0 < self._change(
+            "DELETE FROM shopping_list WHERE id = ? AND user_id = ?",
+            (item_id, user_id),
+            conn,
+        )
 
     def delete_bought(self, user_id: int) -> int:
         """Удаляет все купленные позиции и возвращает их число."""
-        with self._connection() as c:
-            cursor = c.execute(
-                "DELETE FROM shopping_list WHERE user_id = ? AND is_bought = 1",
-                (user_id,),
-            )
-            return cursor.rowcount
+        return self._change(
+            "DELETE FROM shopping_list WHERE user_id = ? AND is_bought = 1",
+            (user_id,),
+        )

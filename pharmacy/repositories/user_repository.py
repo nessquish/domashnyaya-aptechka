@@ -49,13 +49,12 @@ class UserRepository(BaseRepository):
         Raises:
             sqlite3.IntegrityError: Если логин или почта уже заняты.
         """
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "INSERT INTO users (login, username, email, password_hash)"
-                " VALUES (?, ?, ?, ?)",
-                (login, username, email, password_hash),
-            )
-            return cursor.lastrowid
+        return self._insert(
+            "INSERT INTO users (login, username, email, password_hash)"
+            " VALUES (?, ?, ?, ?)",
+            (login, username, email, password_hash),
+            conn,
+        )
 
     def get_by_id(self, user_id: int) -> Optional[User]:
         """Находит пользователя по идентификатору (None, если нет)."""
@@ -92,10 +91,7 @@ class UserRepository(BaseRepository):
 
     def email_exists(self, email: str) -> bool:
         """Проверяет, зарегистрирована ли уже такая почта (без учёта регистра)."""
-        row = self.db.fetch_one(
-            "SELECT 1 AS found FROM users WHERE email = ? COLLATE NOCASE", (email,)
-        )
-        return row is not None
+        return self.get_by_email(email) is not None
 
     def email_used_by_other(self, email: str, user_id: int) -> bool:
         """Проверяет, занята ли почта другим пользователем (не user_id)."""
@@ -110,18 +106,16 @@ class UserRepository(BaseRepository):
         self, user_id: int, username: str, email: str, login: Optional[str] = None
     ) -> None:
         """Меняет имя, почту и (если указан) логин пользователя."""
-        with self._connection() as c:
-            if login is None:
-                c.execute(
-                    "UPDATE users SET username = ?, email = ? WHERE id = ?",
-                    (username, email, user_id),
-                )
-            else:
-                c.execute(
-                    "UPDATE users SET username = ?, email = ?, login = ?"
-                    " WHERE id = ?",
-                    (username, email, login, user_id),
-                )
+        if login is None:
+            self._change(
+                "UPDATE users SET username = ?, email = ? WHERE id = ?",
+                (username, email, user_id),
+            )
+        else:
+            self._change(
+                "UPDATE users SET username = ?, email = ?, login = ? WHERE id = ?",
+                (username, email, login, user_id),
+            )
 
     def update_settings(
         self,
@@ -132,18 +126,11 @@ class UserRepository(BaseRepository):
         notify_low_stock: bool,
     ) -> None:
         """Сохраняет настройки пользователя."""
-        with self._connection() as c:
-            c.execute(
-                "UPDATE users SET warning_days = ?, theme = ?,"
-                " notify_expired = ?, notify_low_stock = ? WHERE id = ?",
-                (
-                    warning_days,
-                    theme,
-                    int(notify_expired),
-                    int(notify_low_stock),
-                    user_id,
-                ),
-            )
+        self._change(
+            "UPDATE users SET warning_days = ?, theme = ?,"
+            " notify_expired = ?, notify_low_stock = ? WHERE id = ?",
+            (warning_days, theme, int(notify_expired), int(notify_low_stock), user_id),
+        )
 
     def update_password_hash(
         self,
@@ -158,13 +145,12 @@ class UserRepository(BaseRepository):
             password_hash: Новый хэш пароля.
             conn: Соединение внешней транзакции (необязательно).
         """
-        with self._connection(conn) as c:
-            c.execute(
-                "UPDATE users SET password_hash = ? WHERE id = ?",
-                (password_hash, user_id),
-            )
+        self._change(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (password_hash, user_id),
+            conn,
+        )
 
     def delete(self, user_id: int) -> None:
         """Удаляет пользователя; товары, покупки и история удаляются каскадом."""
-        with self._connection(None) as conn:
-            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        self._change("DELETE FROM users WHERE id = ?", (user_id,))

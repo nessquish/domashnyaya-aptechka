@@ -39,6 +39,16 @@ class SeedDemoTest(DatabaseTestCase):
         self.assertEqual(self.count_rows("users"), 1)
         self.assertEqual(self.count_rows("products"), len(DEMO_PRODUCTS))
 
+    def test_refill_replaces_the_demo_data_and_keeps_other_accounts(self):
+        first = seed_demo(self.db)
+        seed_full(self.db, first)
+        other = self.add_user("boris")
+        self.add_product(other, name="Чужой")
+        self.assertEqual(seed_demo(self.db, refill=True), first)
+        self.assertEqual(self.count_rows("products"), len(DEMO_PRODUCTS) + 1)
+        self.assertEqual(self.count_rows("users"), 2)
+        self.assertTrue(seed_full(self.db, first))
+
     def test_demo_has_expired_and_expiring_products(self):
         seed_demo(self.db)
         expired = self.db.fetch_one(
@@ -139,7 +149,10 @@ class SeedFullTest(DatabaseTestCase):
         rows = self.db.fetch_all(
             "SELECT source, is_bought, product_id FROM shopping_list"
         )
-        self.assertEqual({r["source"] for r in rows}, {"manual", "notification"})
+        self.assertEqual(
+            {r["source"] for r in rows},
+            {"manual", "notification", "kit", "card", "home", "import"},
+        )
         self.assertEqual({r["is_bought"] for r in rows}, {0, 1})
         self.assertTrue(any(r["product_id"] is None for r in rows))
         self.assertTrue(any(r["product_id"] is not None for r in rows))

@@ -91,7 +91,7 @@ class ImportTest(DataTestCase):
         )
         result = self.services.data.import_products(self.user_id, path)
         self.assertEqual((result.added, result.skipped), (1, 2))
-        self.assertTrue(result.errors[0].startswith("Строка 2"))
+        self.assertTrue(result.errors[0].startswith("Моя аптечка, строка 2"))
 
     def test_other_extensions_and_broken_files_are_rejected(self):
         for name, text in (("a.txt", "x"), ("a.json", "[]")):
@@ -151,13 +151,36 @@ class ManualScaleTest(unittest.TestCase):
             os.environ.pop(scaling.ENV_NAME)
             self.assertEqual(scaling.apply_scale_factor(0.1), scaling.MIN_MANUAL)
         finally:
+            scaling._applied = False
             os.environ.pop(scaling.ENV_NAME, None)
             if saved is not None:
                 os.environ[scaling.ENV_NAME] = saved
 
 
-if __name__ == "__main__":
-    unittest.main()
+class ReportTest(unittest.TestCase):
+    def test_report_lists_counts_and_every_reason_grouped(self):
+        from pharmacy.services.data_service import ImportResult
+
+        result = ImportResult(added=3, shopping_added=67)
+        result.issues = [
+            ("Моя аптечка", 3, "Слишком большое значение"),
+            ("Моя аптечка", 5, "Слишком большое значение"),
+            ("Список покупок", 4, "Введите название"),
+        ]
+        self.assertEqual(
+            result.report().split("\n"),
+            [
+                "Добавлено товаров в аптечку: 3",
+                "Добавлено товаров в список покупок: 67",
+                "Ошибка импорта: Слишком большое значение (Моя аптечка, строки 3, 5)",
+                "Ошибка импорта: Введите название (Список покупок, строка 4)",
+            ],
+        )
+
+    def test_report_without_problems_has_no_error_lines(self):
+        from pharmacy.services.data_service import ImportResult
+
+        self.assertNotIn("Ошибка", ImportResult(added=1).report())
 
 
 class TemplateTest(DataTestCase):
@@ -168,37 +191,61 @@ class TemplateTest(DataTestCase):
         result = self.services.data.import_products(other, path)
         self.assertEqual((result.added, result.skipped), (2, 0))
 
-    def test_excel_template_has_header_examples_and_hints(self):
+    def test_excel_template_has_two_tables_and_hints(self):
         from openpyxl import load_workbook
 
         path = self.folder / "t.xlsx"
         self.services.data.write_template(path, "xlsx")
         book = load_workbook(path)
-        self.assertEqual(book.sheetnames, ["Аптечка", "Подсказки"])
-        sheet = book["Аптечка"]
-        self.assertEqual(sheet["A1"].value, "Название")
-        self.assertEqual(sheet.max_row, 3)
-        hints = [row[1].value for row in book["Подсказки"].iter_rows()]
-        self.assertIn("Лекарства", hints)
+        self.assertEqual(book.sheetnames, ["Правила", "Моя аптечка", "Список покупок"])
+        kit = book["Моя аптечка"]
+        self.assertEqual(kit["A2"].value, "Название")
+        self.assertNotIn("Дата добавления", [c.value for c in kit[2]])
+        self.assertEqual(book["Список покупок"]["A2"].value, "Товар")
+        lists = [
+            check.formula1
+            for check in kit.data_validations.dataValidation
+            if check.type == "list"
+        ]
+        for category in self.services.products.list_categories():
+            self.assertIn(category.name, lists[0])
 
-    def test_excel_template_imports_back_and_dates_typed_in_excel_work(self):
+    def test_filled_excel_template_imports_products_and_shopping(self):
         from datetime import datetime
         from openpyxl import load_workbook
 
         path = self.folder / "t.xlsx"
         self.services.data.write_template(path, "xlsx")
         book = load_workbook(path)
-        book["Аптечка"]["E3"] = datetime(2030, 5, 17)  # дата, введённая как дата
+        sheet = book["Моя аптечка"]
+        rows = (
+            ("Йод", "Лекарства", 2, "фл.", datetime(2030, 5, 17), "Шкаф"),
+            ("Вата", "Нет такой", 1, "шт.", None, None),
+        )
+        for row, values in enumerate(rows, start=3):
+            for column, value in enumerate(values, start=1):
+                sheet.cell(row, column, value)
+        shopping = book["Список покупок"]
+        shopping["A3"], shopping["B3"] = "Пластыри", 3
+        shopping["A4"] = "Бинт"
         book.save(path)
         other = self.add_user("boris")
         result = self.services.data.import_products(other, path)
-        self.assertEqual((result.added, result.skipped), (2, 0))
-        dates = {
-            v.product.name: v.product.expiry_date
-            for v in self.services.products.list_products(other)
-        }
-        self.assertEqual(dates["Бинт"].isoformat(), "2030-05-17")
+        self.assertEqual((result.added, result.shopping_added), (1, 2))
+        self.assertEqual(len(result.errors), 1)
+        self.assertTrue(result.errors[0].startswith("Моя аптечка, строка 4"))
+        product = self.products(other)[0].product
+        self.assertEqual(product.expiry_date.isoformat(), "2030-05-17")
+        items = self.services.shopping.list_items(other)
+        self.assertEqual(
+            {(i.name, i.quantity) for i in items}, {("Пластыри", 3), ("Бинт", 1)}
+        )
+        self.assertEqual({i.source for i in items}, {"import"})
 
     def test_unknown_template_format_is_rejected(self):
         with self.assertRaises(ValidationError):
             self.services.data.write_template(self.folder / "t.json", "json")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -42,13 +42,14 @@ def build_services(db: Database) -> Services:
     """
     notifications = NotificationService(db)
     products = ProductService(db, notifications)
+    shopping = ShoppingService(db)
     return Services(
         auth=AuthService(db),
         products=products,
         notifications=notifications,
-        shopping=ShoppingService(db),
+        shopping=shopping,
         history=HistoryService(db),
         settings=SettingsService(db, notifications),
         dashboard=DashboardService(db, products),
-        data=DataService(db, products),
+        data=DataService(db, products, shopping),
     )

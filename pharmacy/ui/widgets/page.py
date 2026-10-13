@@ -4,10 +4,9 @@ from typing import Optional
 
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
-from pharmacy.ui.widgets.wrap import TwoSideLayout
-
-from pharmacy.ui.widgets.common import label
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
+from pharmacy.ui.widgets.common import label
+from pharmacy.ui.widgets.wrap import TwoSideLayout
 
 # Края карточек и кнопок отстоят от своих виджетов на разную величину,
 # поэтому у кнопок в заголовке справа добавляется недостающий отступ.
