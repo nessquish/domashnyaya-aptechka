@@ -175,11 +175,13 @@ class TemplateTest(DataTestCase):
         self.assertEqual(kit["A2"].value, "Название")
         self.assertNotIn("Дата добавления", [c.value for c in kit[2]])
         self.assertEqual(book["Список покупок"]["A2"].value, "Товар")
-        names = [row[2].value for row in book["Правила"].iter_rows(min_row=2)]
-        self.assertEqual(
-            {c.name for c in self.services.products.list_categories()},
-            set(names[:4]),
-        )
+        lists = [
+            check.formula1
+            for check in kit.data_validations.dataValidation
+            if check.type == "list"
+        ]
+        for category in self.services.products.list_categories():
+            self.assertIn(category.name, lists[0])
 
     def test_filled_excel_template_imports_products_and_shopping(self):
         from datetime import datetime
