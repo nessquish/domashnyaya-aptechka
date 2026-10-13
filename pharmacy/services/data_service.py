@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 from pharmacy.db.connection import Database
 from pharmacy.errors import ValidationError
@@ -101,30 +101,22 @@ class DataService:
         rows = []
         for view in self._products.list_products(user_id, sort="name"):
             product = view.product
+            special = {
+                "category": product.category_name,
+                "expiry_date": format_user_date(product.expiry_date),
+            }
             rows.append(
-                {
-                    "name": product.name,
-                    "category": product.category_name,
-                    "quantity": product.quantity,
-                    "unit": product.unit,
-                    "expiry_date": format_user_date(product.expiry_date),
-                    "indications": product.indications,
-                    "storage_place": product.storage_place,
-                    "min_quantity": product.min_quantity,
-                    "note": product.note,
-                }
+                {key: special.get(key, getattr(product, key, None)) for key in COLUMNS}
             )
         return rows
 
     @staticmethod
     def _cells(row: Dict[str, object]) -> List[object]:
-        cells = []
-        for key in COLUMNS:
-            value = row[key]
-            if key in ("quantity", "min_quantity"):
-                value = format_quantity(float(value))
-            cells.append(value)
-        return cells
+        numbers = ("quantity", "min_quantity")
+        return [
+            format_quantity(float(row[key])) if key in numbers else row[key]
+            for key in COLUMNS
+        ]
 
     @staticmethod
     def _write_excel(path: Path, rows: List[Dict[str, object]]) -> None:
@@ -272,20 +264,11 @@ class DataService:
         result = ImportResult()
         for number, record in enumerate(records, start=1):
             try:
-                form = self._form(record, categories)
-                self._products.add_product(user_id, form)
+                self._products.add_product(user_id, self._form(record, categories))
+                result.added += 1
             except ValidationError as error:
                 result.errors.append(f"Строка {number}: {error.message}")
-                continue
-            result.added += 1
         return result
-
-    @staticmethod
-    def _read_json(path: Path) -> List[Dict[str, object]]:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        if not isinstance(data, list) or not all(isinstance(x, dict) for x in data):
-            raise ValueError("ожидается список товаров")
-        return data
 
     @staticmethod
     def _read_xlsx(path: Path) -> List[Dict[str, object]]:
@@ -300,23 +283,16 @@ class DataService:
                 header = next(rows)
             except StopIteration:
                 return []
-            titles = [
-                (
-                    _BY_TITLE.get(str(cell).strip().casefold())
-                    if cell is not None
-                    else None
-                )
-                for cell in header
+            titles = [_BY_TITLE.get(str(cell).strip().casefold()) for cell in header]
+            records = [
+                {
+                    key: value
+                    for key, value in zip(titles, raw)
+                    if key is not None and value is not None
+                }
+                for raw in rows
             ]
-            records = []
-            for raw in rows:
-                record = {}
-                for key, value in zip(titles, raw):
-                    if key is not None and value is not None:
-                        record[key] = value
-                if record:
-                    records.append(record)
-            return records
+            return [record for record in records if record]
         finally:
             book.close()  # иначе Windows держит файл открытым
 
@@ -330,9 +306,10 @@ class DataService:
         for raw in reader:
             record = {}
             for title, value in raw.items():
-                key = _BY_TITLE.get((title or "").strip().casefold())
-                if key is None and title and title.strip() in COLUMNS:
-                    key = title.strip()
+                title = (title or "").strip()
+                key = _BY_TITLE.get(title.casefold()) or (
+                    title if title in COLUMNS else None
+                )
                 if key is not None:
                     record[key] = value
             records.append(record)
@@ -348,21 +325,11 @@ class DataService:
                 )
             return "" if value is None else str(value).strip()
 
-        name = text("category").casefold()
-        category_id: Optional[int] = categories.get(name)
+        category_id = categories.get(text("category").casefold())
         if category_id is None:
             raise ValidationError(f"неизвестная категория «{text('category')}»")
-        return ProductForm(
-            name=text("name"),
-            category_id=category_id,
-            quantity=text("quantity"),
-            unit=text("unit"),
-            expiry_date=text("expiry_date"),
-            indications=text("indications"),
-            storage_place=text("storage_place"),
-            min_quantity=text("min_quantity"),
-            note=text("note"),
-        )
+        texts = {key: text(key) for key in COLUMNS if key != "category"}
+        return ProductForm(category_id=category_id, **texts)
 
     # --- сброс ---
 

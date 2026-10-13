@@ -11,8 +11,8 @@ from pharmacy.ui.widgets.actionbar import HEIGHT as BAR_HEIGHT, ActionBar
 from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
-from pharmacy.ui.widgets.common import Line, clear_layout, label
-from pharmacy.ui.widgets.controls import Checkbox, Pagination
+from pharmacy.ui.widgets.controls import Checkbox
+from pharmacy.ui.widgets.footer import fill_footer
 from pharmacy.ui.widgets.dialog import Dialog
 from pharmacy.ui.widgets.popup import PopupList
 from pharmacy.ui.widgets.empty import EmptyState
@@ -177,25 +177,26 @@ class MyKitScreen(QWidget):
 
     def _apply_search(self) -> None:
         self._search = self._search_field.get().strip()
+        self._restart()
+
+    def _restart(self) -> None:
+        """Возвращает на первую страницу и перерисовывает таблицу."""
         self._page = 1
         self._reload()
 
     def _on_category(self, value: object) -> None:
         self._category = value
-        self._page = 1
-        self._reload()
+        self._restart()
 
     def _on_status(self, value: object) -> None:
         self._status = value
-        self._page = 1
-        self._reload()
+        self._restart()
 
     def _on_sort(self, value: object) -> None:
         """Выбран подвид сортировки: запоминаем его и перерисовываем таблицу."""
         self._sort = str(value)
         self._shell.app.preferences.set(self._user.id, SORT_PREFERENCE, self._sort)
-        self._page = 1
-        self._reload()
+        self._restart()
 
     def _on_header(self, kind: sorting.SortKind) -> None:
         """Нажатие на заголовок столбца.
@@ -366,7 +367,15 @@ class MyKitScreen(QWidget):
                     ),
                     on_click=lambda i=pid: self._flip(i),
                 )
-            self._build_footer(len(views), start, len(shown), pages)
+            self.summary, self.pagination = fill_footer(
+                self._footer,
+                self._page,
+                pages,
+                len(views),
+                start,
+                len(shown),
+                self._on_page,
+            )
             self._update_bar()
         finally:
             self.setUpdatesEnabled(True)
@@ -388,11 +397,15 @@ class MyKitScreen(QWidget):
         """Общий флажок в шапке: отметить товары страницы."""
         return self._select_page
 
-    def _toggle(self, product_id: int, value: bool) -> None:
+    def _mark(self, product_ids: List[int], value: bool) -> None:
+        """Ставит или снимает отметку у товаров."""
         if value:
-            self._selected.add(product_id)
+            self._selected.update(product_ids)
         else:
-            self._selected.discard(product_id)
+            self._selected.difference_update(product_ids)
+
+    def _toggle(self, product_id: int, value: bool) -> None:
+        self._mark([product_id], value)
         if product_id in self._shown_ids:
             self._table.set_row_selected(self._shown_ids.index(product_id), value)
         self._update_bar()
@@ -404,11 +417,7 @@ class MyKitScreen(QWidget):
             box.set(shown_id in self._selected)
 
     def _toggle_page(self, value: bool) -> None:
-        for product_id in self._shown_ids:
-            if value:
-                self._selected.add(product_id)
-            else:
-                self._selected.discard(product_id)
+        self._mark(self._shown_ids, value)
         self._reload()
 
     def _select_everything(self) -> None:
@@ -428,10 +437,9 @@ class MyKitScreen(QWidget):
         else:
             self._bar.hide_bar()
         self.all_button.setVisible(count < self._total)
-        everything = bool(self._shown_ids) and all(
-            i in self._selected for i in self._shown_ids
+        self._select_page.set(
+            bool(self._shown_ids) and self._selected.issuperset(self._shown_ids)
         )
-        self._select_page.set(everything)
 
     def _finish(self, message: str) -> None:
         """Снимает отметки и на пару секунд показывает итог действия в панели."""
@@ -504,10 +512,9 @@ class MyKitScreen(QWidget):
             view.product.quantity
             for view in self._services.products.list_products(self._user.id)
         ]
-        if quantities:
-            sorting.set_quantity_range(min(quantities), max(quantities))
-        else:
-            sorting.set_quantity_range(None, None)
+        sorting.set_quantity_range(
+            min(quantities, default=None), max(quantities, default=None)
+        )
 
     @property
     def table(self) -> DataTable:
@@ -537,23 +544,6 @@ class MyKitScreen(QWidget):
             TextCell(product.storage_place or "—", "ink_2"),
             lambda: Badge(status.label, labels.STATUS_TONES[status]),
         ]
-
-    def _build_footer(self, total: int, start: int, shown: int, pages: int) -> None:
-        clear_layout(self._footer)
-        self._footer.addWidget(Line("line"))
-        row = QHBoxLayout()
-        row.setContentsMargins(14, 10, 14, 10)
-        text = (
-            f"Показано {start + 1}–{start + shown} из {total}"
-            if shown
-            else "Показано 0 из 0"
-        )
-        self.summary = label(text, "small", "ink_2")
-        row.addWidget(self.summary)
-        row.addStretch(1)
-        self.pagination = Pagination(self._page, pages, self._on_page)
-        row.addWidget(self.pagination)
-        self._footer.addLayout(row)
 
     def _on_page(self, page: int) -> None:
         self._page = page

@@ -69,9 +69,9 @@ class ShoppingService:
         if amount <= 0:
             raise ValidationError("Количество должно быть больше нуля", "quantity")
         unit = normalize_unit(unit)
-        if product_id is not None and self._products.get(user_id, product_id) is None:
-            raise NotFoundError("Товар не найден")
         if product_id is not None:
+            if self._products.get(user_id, product_id) is None:
+                raise NotFoundError("Товар не найден")
             existing = self._items.find_open_for_product(user_id, product_id)
             if existing is not None:
                 return self._increase(user_id, existing, amount)
@@ -149,10 +149,8 @@ class ShoppingService:
                 self.add_from_product(user_id, product_id, source=source)
             except (NotFoundError, ValidationError):
                 continue
-            if was_in_list:
-                increased += 1
-            else:
-                created += 1
+            increased += was_in_list
+            created += not was_in_list
         return created, increased
 
     def _increase(
@@ -176,12 +174,8 @@ class ShoppingService:
         self, user_id: int, query: str, limit: int = 10
     ) -> List[ShoppingItem]:
         """Ищет позиции списка покупок по названию (для поиска по программе)."""
-        found = [
-            item
-            for item in self._items.list_for_user(user_id)
-            if name_matches(item.name, query)
-        ]
-        return found[:limit]
+        items = self._items.list_for_user(user_id)
+        return [item for item in items if name_matches(item.name, query)][:limit]
 
     def is_in_list(self, user_id: int, product_id: int) -> bool:
         """Проверяет, есть ли товар в списке покупок среди не купленных."""

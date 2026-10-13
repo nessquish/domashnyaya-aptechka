@@ -1,7 +1,7 @@
 """Бизнес-логика работы с товарами аптечки."""
 
 import math
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from datetime import date
 from typing import List, Optional, Sequence
 
@@ -98,12 +98,13 @@ def _parse_amount(text: str, field_name: str, empty_message: Optional[str]) -> f
         if empty_message is not None:
             raise ValidationError(empty_message, field_name)
         return 0.0
+    not_a_number = ValidationError("Введите число, например 2 или 1,5", field_name)
     try:
         value = float(cleaned)
     except ValueError:
-        raise ValidationError("Введите число, например 2 или 1,5", field_name) from None
+        raise not_a_number from None
     if not math.isfinite(value):
-        raise ValidationError("Введите число, например 2 или 1,5", field_name)
+        raise not_a_number
     if value < 0:
         raise ValidationError("Значение не может быть отрицательным", field_name)
     if value > MAX_AMOUNT:
@@ -122,15 +123,7 @@ def _check_length(text: str, limit: int, label: str, field_name: str) -> str:
 def _to_data(product: Product) -> ProductData:
     """Данные товара в виде, готовом к записи (чтобы изменить одно поле)."""
     return ProductData(
-        name=product.name,
-        category_id=product.category_id,
-        quantity=product.quantity,
-        unit=product.unit,
-        expiry_date=product.expiry_date,
-        indications=product.indications,
-        storage_place=product.storage_place,
-        min_quantity=product.min_quantity,
-        note=product.note,
+        **{f.name: getattr(product, f.name) for f in fields(ProductData)}
     )
 
 
@@ -334,9 +327,9 @@ class ProductService:
         for product_id in product_ids:
             try:
                 self.delete_product(user_id, product_id)
+                deleted += 1
             except NotFoundError:
-                continue
-            deleted += 1
+                pass
         return deleted
 
     def change_category(
@@ -476,13 +469,11 @@ class ProductService:
         low_threshold: float = 0,
     ) -> ProductView:
         """Собирает ProductView: товар, его состояния и дни до конца срока."""
-        days_left = None
-        if product.expiry_date is not None:
-            days_left = days_until(product.expiry_date, today)
+        expiry = product.expiry_date
         return ProductView(
             product=product,
             statuses=product_statuses(product, warning_days, today, low_threshold),
-            days_left=days_left,
+            days_left=None if expiry is None else days_until(expiry, today),
         )
 
     def _low_threshold(self, user_id: int) -> float:

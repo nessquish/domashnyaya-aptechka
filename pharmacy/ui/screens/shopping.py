@@ -14,8 +14,8 @@ from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
 from pharmacy.ui.widgets.combo import ComboField
-from pharmacy.ui.widgets.common import Line, clear_layout, label
-from pharmacy.ui.widgets.controls import Checkbox, Pagination, Segmented
+from pharmacy.ui.widgets.controls import Checkbox, Segmented
+from pharmacy.ui.widgets.footer import fill_footer
 from pharmacy.ui.widgets.dialog import Modal
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.page import PageHeader
@@ -204,7 +204,15 @@ class ShoppingScreen(QWidget):
                     item.id in self._selected or item.id == self._flash_id,
                     on_click=lambda i=item.id: self._flip(i),
                 )
-            self._build_footer(len(found), start, pages)
+            self.summary, self.pagination = fill_footer(
+                self._footer,
+                self._page,
+                pages,
+                len(found),
+                start,
+                len(self._visible),
+                self._on_page,
+            )
             self._update_bar()
         finally:
             self.setUpdatesEnabled(True)
@@ -238,25 +246,6 @@ class ShoppingScreen(QWidget):
                 "green" if bought else "red",
             ),
         ]
-
-    def _build_footer(self, total: int, start: int, pages: int) -> None:
-        """Строка «Показано …» и переключатель страниц."""
-        clear_layout(self._footer)
-        self._footer.addWidget(Line("line"))
-        row = QHBoxLayout()
-        row.setContentsMargins(14, 10, 14, 10)
-        shown = len(self._visible)
-        text = (
-            f"Показано {start + 1}–{start + shown} из {total}"
-            if shown
-            else "Показано 0 из 0"
-        )
-        self.summary = label(text, "small", "ink_2")
-        row.addWidget(self.summary)
-        row.addStretch(1)
-        self.pagination = Pagination(self._page, pages, self._on_page)
-        row.addWidget(self.pagination)
-        self._footer.addLayout(row)
 
     def reveal(self, item_id: int) -> None:
         """Показывает страницу, где стоит позиция, и подсвечивает её на пару секунд."""
