@@ -17,9 +17,9 @@ WHEEL_STEP = 14  # колёсико двигает на три таких шаг
 class ScrollArea(QScrollArea):
     """Область, в которой содержимое прокручивается, если оно выше окна.
 
-    Содержимое добавляется в ``body``. Полоса прокрутки тонкая, ползунок виден
-    только при переполнении. Поле под полосу занято всегда, поэтому ширина
-    содержимого не прыгает.
+    Содержимое добавляется в ``body``. Полоса прокрутки тонкая и показывается
+    только при переполнении. Когда полосы нет, справа остаётся пустое поле той
+    же ширины, поэтому ширина содержимого не прыгает.
 
     Attributes:
         body: Вертикальная раскладка для содержимого.
@@ -40,7 +40,7 @@ class ScrollArea(QScrollArea):
         self.setWidgetResizable(True)
         # Полоса снизу нужна только в узком окне, когда открыто боковое меню.
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         thumb = mix(pal.line, pal.ink_3, 0.55)
         self.setStyleSheet(
             "QScrollArea, QScrollArea > QWidget > QWidget {"
@@ -75,6 +75,14 @@ class ScrollArea(QScrollArea):
         self.body.setSpacing(0)
         self.setWidget(host)
         self.viewport().setAutoFillBackground(False)
+        self._gutter = gutter
+        self.body.setContentsMargins(0, 0, gutter, 0)
+        self.verticalScrollBar().rangeChanged.connect(self._fill_gutter)
+
+    def _fill_gutter(self, low: int, high: int) -> None:
+        """Пока полосы нет, оставляет справа пустое поле: ширина не прыгает."""
+        right = 0 if high > low else self._gutter
+        self.body.setContentsMargins(0, 0, right, 0)
 
     def scroll_to_top(self) -> None:
         """Возвращает содержимое в начало (при смене экрана)."""
