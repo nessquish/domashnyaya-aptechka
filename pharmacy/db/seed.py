@@ -11,7 +11,7 @@
 import argparse
 import random
 from datetime import date, timedelta
-from typing import Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 from pharmacy.db.connection import Database
 from pharmacy.utils.security import hash_password
@@ -68,6 +68,36 @@ def _timestamp(days_ago: int, time_text: str) -> str:
     return f"{day.isoformat()} {time_text}"
 
 
+def _category_ids(db: Database) -> Dict[str, int]:
+    """Номера категорий по названиям."""
+    rows = db.fetch_all("SELECT id, name FROM categories")
+    return {row["name"]: row["id"] for row in rows}
+
+
+def _add_products(conn, user_id: int, categories: Dict[str, int], rows) -> Dict:
+    """Записывает товары (строки DEMO_PRODUCTS или FULL_PRODUCTS), возвращает номера."""
+    ids = {}
+    for name, category, quantity, unit, days, place, minimum, notes, *note in rows:
+        ids[name] = conn.execute(
+            "INSERT INTO products (user_id, category_id, name, quantity, unit,"
+            " expiry_date, storage_place, min_quantity, indications, note)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                categories[category],
+                name,
+                quantity,
+                unit,
+                _expiry_from_today(days),
+                place,
+                minimum,
+                notes,
+                note[0] if note else None,
+            ),
+        ).lastrowid
+    return ids
+
+
 def seed_demo(db: Database) -> Optional[int]:
     """Добавляет демо-пользователя, его товары, список покупок и историю.
 
@@ -80,43 +110,14 @@ def seed_demo(db: Database) -> Optional[int]:
     """
     if db.fetch_one("SELECT id FROM users WHERE login = ?", (DEMO_LOGIN,)):
         return None
-    categories = {
-        row["name"]: row["id"]
-        for row in db.fetch_all("SELECT id, name FROM categories")
-    }
+    categories = _category_ids(db)
     with db.transaction() as conn:
         user_id = conn.execute(
             "INSERT INTO users (login, username, email, password_hash)"
             " VALUES (?, ?, ?, ?)",
             (DEMO_LOGIN, DEMO_USERNAME, DEMO_EMAIL, hash_password(DEMO_PASSWORD)),
         ).lastrowid
-        product_ids = {}
-        for (
-            name,
-            category,
-            quantity,
-            unit,
-            days,
-            place,
-            minimum,
-            notes,
-        ) in DEMO_PRODUCTS:
-            product_ids[name] = conn.execute(
-                "INSERT INTO products (user_id, category_id, name, quantity, unit,"
-                " expiry_date, storage_place, min_quantity, indications)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    user_id,
-                    categories[category],
-                    name,
-                    quantity,
-                    unit,
-                    _expiry_from_today(days),
-                    place,
-                    minimum,
-                    notes,
-                ),
-            ).lastrowid
+        product_ids = _add_products(conn, user_id, categories, DEMO_PRODUCTS)
         conn.executemany(
             "INSERT INTO shopping_list (user_id, product_id, name, quantity, unit,"
             " source, is_bought, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -450,10 +451,7 @@ def seed_full(db: Database, user_id: int) -> bool:
         (user_id, FULL_MARKER),
     ):
         return False
-    categories = {
-        row["name"]: row["id"]
-        for row in db.fetch_all("SELECT id, name FROM categories")
-    }
+    categories = _category_ids(db)
     ids = {
         row["name"]: row["id"]
         for row in db.fetch_all(
@@ -461,34 +459,7 @@ def seed_full(db: Database, user_id: int) -> bool:
         )
     }
     with db.transaction() as conn:
-        for (
-            name,
-            category,
-            quantity,
-            unit,
-            days,
-            place,
-            minimum,
-            notes,
-            note,
-        ) in FULL_PRODUCTS:
-            ids[name] = conn.execute(
-                "INSERT INTO products (user_id, category_id, name, quantity, unit,"
-                " expiry_date, storage_place, min_quantity, indications, note)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    user_id,
-                    categories[category],
-                    name,
-                    quantity,
-                    unit,
-                    _expiry_from_today(days),
-                    place,
-                    minimum,
-                    notes,
-                    note,
-                ),
-            ).lastrowid
+        ids.update(_add_products(conn, user_id, categories, FULL_PRODUCTS))
         conn.executemany(
             "INSERT INTO shopping_list (user_id, product_id, name, quantity, unit,"
             " source, is_bought, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",

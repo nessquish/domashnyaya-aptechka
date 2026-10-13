@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QWi
 
 from pharmacy.ui.fonts import line_height
 from pharmacy.ui.widgets.card import Card
-from pharmacy.ui.widgets.common import clickable, label, pad
+from pharmacy.ui.widgets.common import clickable, empty_message, label
 from pharmacy.ui.theme import palette
 
 HEADER_PADDING_Y = 10
@@ -225,10 +225,9 @@ class DataTable(QWidget):
         Выключается, когда над таблицей стоит панель действий.
         """
         self._rounded_top = rounded
-        if self._card is not None and rounded:
-            self._card.set_band(self._header_height, palette().table_head)
-        elif self._card is not None:
-            self._card.set_band(0, None)
+        if self._card is not None:
+            band = (self._header_height, palette().table_head) if rounded else (0, None)
+            self._card.set_band(*band)
         self._grid_host.paint_header = not (rounded and self._card is not None)
         self._grid_host.update()
 
@@ -325,18 +324,14 @@ class DataTable(QWidget):
             return
         if grid_row is None:
             grid_row = 2 + 2 * index  # разделитель и строка идут парами
-        fill = _Fill(palette().unread_bg)
-        self._fills[index] = fill
+        fill = self._fills[index] = _Fill(palette().unread_bg)
         self._add(fill, grid_row, 0, len(self._columns))
         fill.lower()
 
     def add_message(self, text: str) -> None:
         """Добавляет строку с сообщением на всю ширину («Ничего не найдено»)."""
         self._separator()
-        message = label(text, "body", "ink_3")
-        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pad(message, 0, 36, 0, 36)
-        self._add(message, self._next_row, 0, len(self._columns))
+        self._add(empty_message(text, 36), self._next_row, 0, len(self._columns))
         self._next_row += 1
 
     @property

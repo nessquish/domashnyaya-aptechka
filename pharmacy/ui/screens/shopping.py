@@ -1,7 +1,6 @@
 """Экран «Список покупок» (макет Figma, экраны 09 и 10)."""
 
 import math
-from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 from PySide6.QtCore import QTimer
@@ -9,7 +8,8 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from pharmacy.errors import ValidationError
 from pharmacy.models import ShoppingItem, ShoppingSource
-from pharmacy.ui.widgets.actionbar import HEIGHT as BAR_HEIGHT, ActionBar
+from pharmacy.ui.screens.tablescreen import PagedTableScreen
+from pharmacy.ui.widgets.actionbar import ActionBar
 from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
@@ -22,9 +22,9 @@ from pharmacy.ui.widgets.page import PageHeader
 from pharmacy.ui.widgets.popup import PopupList
 from pharmacy.ui.widgets.select import Select
 from pharmacy.ui.widgets.table import Column, DataTable, TextCell
-from pharmacy.ui.paging import fitted_rows, remembered_rows
+from pharmacy.ui.paging import remembered_rows
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
-from pharmacy.utils.dates import format_user_date
+from pharmacy.utils.dates import format_created
 from pharmacy.utils.formatting import format_quantity
 from pharmacy.utils.textmatch import name_matches
 from pharmacy.utils.units import DEFAULT_UNIT, UNITS
@@ -56,7 +56,7 @@ FLASH_MS = 4000  # сколько держится подсветка найде
 
 def _created(item: ShoppingItem) -> str:
     """Дата добавления позиции в формате ДД.ММ.ГГГГ."""
-    return format_user_date(datetime.strptime(item.created_at[:10], "%Y-%m-%d").date())
+    return format_created(item.created_at)
 
 
 def _caption(product) -> str:
@@ -64,8 +64,10 @@ def _caption(product) -> str:
     return f"{product.name} · {format_quantity(product.quantity)} {product.unit}"
 
 
-class ShoppingScreen(QWidget):
+class ShoppingScreen(PagedTableScreen):
     """Таблица позиций с фильтрами-вкладками, выбором строк и действиями над ними."""
+
+    PAGING_KEY = PAGING_KEY
 
     def __init__(self, shell: "MainShell", tab: int = 0) -> None:
         """Создаёт экран.
@@ -269,36 +271,6 @@ class ShoppingScreen(QWidget):
         except RuntimeError:  # экран уже закрыт
             pass
 
-    def _on_page(self, page: int) -> None:
-        self._page = page
-        self._reload()
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        QTimer.singleShot(0, self.fit_rows)
-
-    def fit_rows(self) -> None:
-        """Подгоняет число строк на странице под высоту окна."""
-        if not hasattr(self, "_footer"):
-            return
-        size = fitted_rows(
-            PAGING_KEY,
-            self,
-            self._card,
-            self._table,
-            self._table.header_height,
-            self._table.row_count,
-            self._page_size,
-            self._shell.viewport_height(),
-            0 if self._bar.isVisible() else BAR_HEIGHT,
-        )
-        if size != self._page_size:
-            first = (self._page - 1) * self._page_size
-            self._page_size = size
-            self._page = first // size + 1
-            self._reload()
-            QTimer.singleShot(0, self.fit_rows)
-
     def _update_bar(self) -> None:
         """Показывает панель действий, пока выбрана хотя бы одна строка."""
         count = len(self._selected)
@@ -311,8 +283,7 @@ class ShoppingScreen(QWidget):
             self._bar.hide_bar()
         self.all_button.setVisible(count < len(self._found))
         self._show_bought_action()
-        everything = bool(self._visible) and count == len(self._visible)
-        self._select_all.set(everything)
+        self._select_all.set(bool(self._visible) and count == len(self._visible))
 
     def _show_bought_action(self) -> None:
         """Если все выбранные уже куплены, кнопка возвращает их в список."""

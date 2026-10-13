@@ -6,7 +6,7 @@ import sys
 from typing import Optional
 
 from PySide6.QtCore import QCoreApplication, QLibraryInfo, QLocale, QTranslator, Qt
-from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtGui import QGuiApplication, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication
 
 from pharmacy.ui import fonts
@@ -46,70 +46,63 @@ def _setup(app: QApplication) -> None:
     fonts.register_fonts()
 
 
+def _kde_theme() -> Optional[str]:
+    """Тема KDE Plasma через ``kreadconfig`` (None, если это не KDE)."""
+    if not os.environ.get("XDG_CURRENT_DESKTOP", "").upper().startswith("KDE"):
+        return None
+    for tool in ("kreadconfig6", "kreadconfig5"):
+        command = [tool, "--file", "kdeglobals", "--group", "General"]
+        try:
+            result = subprocess.run(
+                command + ["--key", "ColorScheme"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+        name = (result.stdout or "").strip()
+        if name:
+            return "dark" if "dark" in name.lower() else "light"
+    return None
+
+
+def _windows_theme() -> Optional[str]:
+    """Тема Windows из реестра (None, если это не Windows или ключа нет)."""
+    if sys.platform != "win32":
+        return None
+    import winreg
+
+    path = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as key:
+            light, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+    except OSError:
+        return None
+    return "light" if light else "dark"
+
+
+def _qt_theme() -> Optional[str]:
+    """Тема по данным Qt (для GNOME и остальных сред)."""
+    try:
+        scheme = QGuiApplication.styleHints().colorScheme()
+    except (AttributeError, RuntimeError):
+        return None
+    if scheme == Qt.ColorScheme.Dark:
+        return "dark"
+    return "light" if scheme == Qt.ColorScheme.Light else None
+
+
 def system_theme() -> str:
     """Тема операционной системы сейчас: ``light`` или ``dark``.
 
-    Определяется по-разному в зависимости от окружения:
-
-    * KDE Plasma — через ``kreadconfig5``/``kreadconfig6``;
-    * Windows — через реестр;
-    * остальные среды — через Qt ``QStyleHints``.
-
-    Если ничего не удалось определить — возвращается значение,
-    найденное при запуске.
+    Сначала пробуем KDE, затем реестр Windows, затем Qt. Если ничего не
+    удалось определить, возвращается тема, найденная при запуске.
     """
-    # 1. KDE Plasma
-    if os.environ.get("XDG_CURRENT_DESKTOP", "").upper().startswith("KDE"):
-        for tool in ("kreadconfig6", "kreadconfig5"):
-            try:
-                result = subprocess.run(
-                    [
-                        tool,
-                        "--file",
-                        "kdeglobals",
-                        "--group",
-                        "General",
-                        "--key",
-                        "ColorScheme",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                )
-                name = (result.stdout or "").strip()
-                if name:
-                    return "dark" if "dark" in name.lower() else "light"
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                continue
-
-    # 2. Windows
-    if sys.platform == "win32":
-        try:
-            import winreg
-
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
-            )
-            with key:
-                light, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-            return "light" if light else "dark"
-        except OSError:
-            pass
-
-    # 3. Qt (для GNOME и остальных сред)
-    try:
-        from PySide6.QtCore import Qt
-        from PySide6.QtGui import QGuiApplication
-
-        scheme = QGuiApplication.styleHints().colorScheme()
-        if scheme == Qt.ColorScheme.Dark:
-            return "dark"
-        if scheme == Qt.ColorScheme.Light:
-            return "light"
-    except (AttributeError, RuntimeError):
-        pass
-
+    for detect in (_kde_theme, _windows_theme, _qt_theme):
+        found = detect()
+        if found:
+            return found
     return _system_theme
 
 

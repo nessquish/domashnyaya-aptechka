@@ -52,7 +52,7 @@ class _Frame(QWidget):
         painter = QPainter(self)
         begin(painter)
         border, ring = self._owner.frame_colors()
-        box = QRectF(RING_PAD, RING_PAD, self.width() - 2 * RING_PAD, self._box_height)
+        box = self.box_rect()
         draw_shadows(
             painter, box, theme.CONTROL_RADIUS, (Shadow(1, 2, pal.shadow, 0.05),)
         )
@@ -286,6 +286,22 @@ def show_edit_menu(owner: QWidget, position, entries) -> None:
     build_edit_menu(owner, entries).exec(position)
 
 
+def show_text_menu(owner, event, selected: bool, cut, copy) -> None:
+    """Меню правой кнопки для поля ввода: вырезать, копировать, вставить."""
+    editable = not owner.isReadOnly()
+    show_edit_menu(
+        owner,
+        event.globalPos(),
+        (
+            ("Вырезать", cut, editable and selected),
+            ("Копировать", copy, selected),
+            ("Вставить", owner.paste, editable),
+            None,
+            ("Выделить всё", owner.selectAll, True),
+        ),
+    )
+
+
 class _Edit(QLineEdit):
     """Однострочный ввод без рамки. Скрытый текст можно копировать как есть."""
 
@@ -328,18 +344,8 @@ class _Edit(QLineEdit):
         self.focus_changed.emit(False)
 
     def contextMenuEvent(self, event) -> None:
-        editable = not self.isReadOnly()
-        selected = self.hasSelectedText()
-        show_edit_menu(
-            self,
-            event.globalPos(),
-            (
-                ("Вырезать", self._cut, editable and selected),
-                ("Копировать", self._copy_real_text, selected),
-                ("Вставить", self.paste, editable),
-                None,
-                ("Выделить всё", self.selectAll, True),
-            ),
+        show_text_menu(
+            self, event, self.hasSelectedText(), self._cut, self._copy_real_text
         )
 
     def _cut(self) -> None:
@@ -353,19 +359,8 @@ class _Area(QPlainTextEdit):
     focus_changed = Signal(bool)
 
     def contextMenuEvent(self, event) -> None:
-        editable = not self.isReadOnly()
         selected = self.textCursor().hasSelection()
-        show_edit_menu(
-            self,
-            event.globalPos(),
-            (
-                ("Вырезать", self.cut, editable and selected),
-                ("Копировать", self.copy, selected),
-                ("Вставить", self.paste, editable),
-                None,
-                ("Выделить всё", self.selectAll, True),
-            ),
-        )
+        show_text_menu(self, event, selected, self.cut, self.copy)
 
     def focusInEvent(self, event) -> None:
         super().focusInEvent(event)
@@ -438,13 +433,9 @@ class TextField(LabeledBox):
             self._entry.setPlaceholderText(placeholder)
             self._entry.setReadOnly(readonly)
             self._entry.setFrameShape(_Area.Shape.NoFrame)
-            self.content.setContentsMargins(
-                RING_PAD + TEXT_INSET,
-                RING_PAD + AREA_PADDING_TOP,
-                RING_PAD + TEXT_INSET,
-                RING_PAD + AREA_PADDING_TOP,
-            )
-            self._entry.textChanged.connect(self._notify_area)
+            side, top = RING_PAD + TEXT_INSET, RING_PAD + AREA_PADDING_TOP
+            self.content.setContentsMargins(side, top, side, top)
+            self._entry.textChanged.connect(self._on_edited)
         else:
             self._entry = _Edit(password)
             self._entry.setPlaceholderText(placeholder)
@@ -492,9 +483,7 @@ class TextField(LabeledBox):
 
     def get(self) -> str:
         """Возвращает введённый текст."""
-        if self._multiline:
-            return self._entry.toPlainText()
-        return self._entry.text()
+        return self._entry.toPlainText() if self._multiline else self._entry.text()
 
     def set(self, value: str) -> None:
         """Записывает текст в поле (обработчик изменения не вызывается)."""
@@ -542,12 +531,7 @@ class TextField(LabeledBox):
         """Нажатие на край рамки (вне самого ввода) ставит курсор в поле."""
         self._entry.setFocus()
 
-    def _on_edited(self, _text: str) -> None:
-        self.clear_error()
-        if self._on_change is not None:
-            self._on_change()
-
-    def _notify_area(self) -> None:
+    def _on_edited(self, *_args) -> None:
         self.clear_error()
         if self._on_change is not None:
             self._on_change()

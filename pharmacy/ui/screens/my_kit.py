@@ -1,13 +1,13 @@
 """Экран «Моя аптечка» (макет Figma, экраны 04 и 15): таблица товаров."""
 
 import math
-from datetime import date
 from typing import TYPE_CHECKING, List, Optional, Set
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
-from pharmacy.ui.widgets.actionbar import HEIGHT as BAR_HEIGHT, ActionBar
+from pharmacy.ui.screens.tablescreen import PagedTableScreen
+from pharmacy.ui.widgets.actionbar import ActionBar
 from pharmacy.ui.widgets.badge import Badge
 from pharmacy.ui.widgets.button import Button
 from pharmacy.ui.widgets.card import Card
@@ -26,9 +26,9 @@ from pharmacy.models import ShoppingSource
 from pharmacy.services.product_service import ProductView
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import labels, sorting
-from pharmacy.ui.paging import DEFAULT_ROWS, fitted_rows, remembered_rows
+from pharmacy.ui.paging import DEFAULT_ROWS, remembered_rows
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
-from pharmacy.utils.dates import format_user_date
+from pharmacy.utils.dates import format_created, format_user_date
 from pharmacy.utils.formatting import format_quantity
 
 if TYPE_CHECKING:
@@ -54,13 +54,15 @@ COLUMNS = (
 def _added(product) -> str:
     """Дата добавления товара в формате ДД.ММ.ГГГГ."""
     try:
-        return format_user_date(date.fromisoformat(product.created_at[:10]))
+        return format_created(product.created_at)
     except ValueError:
         return "—"
 
 
-class MyKitScreen(QWidget):
+class MyKitScreen(PagedTableScreen):
     """Список товаров с поиском, фильтрами, сортировкой и страницами."""
+
+    PAGING_KEY = PAGING_KEY
 
     def __init__(
         self,
@@ -233,32 +235,6 @@ class MyKitScreen(QWidget):
                 reverse=self._sort.endswith("_desc"),
             )
         return views
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        QTimer.singleShot(0, self.fit_rows)
-
-    def fit_rows(self) -> None:
-        """Подгоняет число строк на странице под высоту окна."""
-        if not hasattr(self, "_card"):
-            return
-        size = fitted_rows(
-            PAGING_KEY,
-            self,
-            self._card,
-            self._table,
-            self._table.header_height,
-            self._table.row_count,
-            self._page_size,
-            self._shell.viewport_height(),
-            0 if self._bar.isVisible() else BAR_HEIGHT,
-        )
-        if size != self._page_size:
-            first = (self._page - 1) * self._page_size
-            self._page_size = size
-            self._page = first // size + 1
-            self._reload()
-            QTimer.singleShot(0, self.fit_rows)
 
     def reveal(self, product_id: int) -> None:
         """Переходит на страницу таблицы, где стоит товар, и подсвечивает строку.
@@ -544,7 +520,3 @@ class MyKitScreen(QWidget):
             TextCell(product.storage_place or "—", "ink_2"),
             lambda: Badge(status.label, labels.STATUS_TONES[status]),
         ]
-
-    def _on_page(self, page: int) -> None:
-        self._page = page
-        self._reload()

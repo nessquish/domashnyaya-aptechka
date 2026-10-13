@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QSizePolicy, QHBoxLayout, QVBoxLayout, QWidget
 from pharmacy.ui.widgets.badge import Badge, badge_height, measure_badge
 from pharmacy.ui.widgets.button import Button, measure_button
 from pharmacy.ui.widgets.card import Card
-from pharmacy.ui.widgets.common import Line, clickable, label, pad
+from pharmacy.ui.widgets.common import Line, clickable, empty_message, label, pad
 from pharmacy.ui.widgets.iconbox import IconBox
 from pharmacy.ui.widgets.link import Link
 from pharmacy.ui.widgets.page import PageHeader
@@ -19,7 +19,7 @@ from pharmacy.services.product_service import ProductView
 from pharmacy.services.status import ProductStatus
 from pharmacy.ui import labels, sections
 from pharmacy.ui.theme import CARD_SHADOW_PAD, SHADOW_PAD
-from pharmacy.utils.dates import format_user_date
+from pharmacy.utils.dates import format_created, format_user_date
 from pharmacy.utils.formatting import format_quantity
 
 if TYPE_CHECKING:
@@ -43,10 +43,8 @@ def _detail(view: ProductView) -> str:
     if status is ProductStatus.EXPIRING:
         return f"Годен до {format_user_date(product.expiry_date)}"
     unit = product.unit
-    return (
-        f"Осталось {format_quantity(product.quantity)} {unit}"
-        f" · минимум {format_quantity(product.min_quantity)} {unit}"
-    )
+    left = f"{format_quantity(product.quantity)} {unit}"
+    return f"Осталось {left} · минимум {format_quantity(product.min_quantity)} {unit}"
 
 
 def _column() -> QVBoxLayout:
@@ -207,16 +205,9 @@ class DashboardScreen(QWidget):
         card.body.addLayout(row)
         return row
 
-    @staticmethod
-    def _empty(card: Card, text: str) -> None:
-        message = label(text, "body", "ink_3")
-        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pad(message, 0, 40, 0, 40)
-        card.body.addWidget(message)
-
     def _fill_attention(self, card: Card, views: List[ProductView]) -> None:
         if not views:
-            self._empty(card, "Всё в порядке: срочных дел нет")
+            card.body.addWidget(empty_message("Всё в порядке: срочных дел нет"))
             return
         for index, view in enumerate(views):
             if index:
@@ -259,16 +250,14 @@ class DashboardScreen(QWidget):
 
     def _fill_recent(self, card: Card, views: List[ProductView]) -> None:
         if not views:
-            self._empty(card, "Товаров пока нет")
+            card.body.addWidget(empty_message("Товаров пока нет"))
             return
         for index, view in enumerate(views):
             if index:
                 card.body.addWidget(Line())
             row = self._row(card)
             product = view.product
-            added = format_user_date(
-                datetime.strptime(product.created_at[:10], "%Y-%m-%d").date()
-            )
+            added = format_created(product.created_at)
             texts = _column()
             texts.setContentsMargins(SHADOW_PAD, 0, SHADOW_PAD, 0)
             texts.addWidget(self._product_link(view), 0, Qt.AlignmentFlag.AlignLeft)

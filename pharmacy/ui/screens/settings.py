@@ -73,12 +73,8 @@ FIELD_WIDTH = 56
 SCALE_MIN, SCALE_MAX = 80, 150
 PROGRAM_NAME = "Моя аптечка"
 
-EXPORT_FORMATS = (("csv", "CSV"), ("xlsx", "Excel"))
-IMPORT_FORMATS = (("csv", "CSV"), ("xlsx", "Excel"))
-FILTERS = {
-    "csv": "CSV (*.csv)",
-    "xlsx": "Excel (*.xlsx)",
-}
+FILE_FORMATS = (("csv", "CSV"), ("xlsx", "Excel"))
+FILTERS = {"csv": "CSV (*.csv)", "xlsx": "Excel (*.xlsx)"}
 
 
 class SettingsScreen(QWidget):
@@ -143,12 +139,8 @@ class SettingsScreen(QWidget):
         card.setFixedWidth(MENU_WIDTH + 2 * card.inner_inset)
         host = QWidget()
         column = QVBoxLayout(host)
-        column.setContentsMargins(
-            10 - card.inner_inset,
-            10 - card.inner_inset,
-            10 - card.inner_inset,
-            10 - card.inner_inset,
-        )
+        inset = 10 - card.inner_inset
+        column.setContentsMargins(inset, inset, inset, inset)
         column.setSpacing(0)
         for key, title, icon in SECTIONS:
             item = NavItem(title, lambda k=key: self.open_section(k), icon=icon)
@@ -162,12 +154,9 @@ class SettingsScreen(QWidget):
         self._page_card = Card()
         host = QWidget()
         self._page = QVBoxLayout(host)
-        self._page.setContentsMargins(
-            SECTION_PADDING_X - self._page_card.inner_inset,
-            SECTION_PADDING_Y - self._page_card.inner_inset,
-            SECTION_PADDING_X - self._page_card.inner_inset,
-            SECTION_PADDING_Y - self._page_card.inner_inset,
-        )
+        inset = self._page_card.inner_inset
+        x, y = SECTION_PADDING_X - inset, SECTION_PADDING_Y - inset
+        self._page.setContentsMargins(x, y, x, y)
         self._page.setSpacing(0)
         host.setMinimumHeight(PAGE_MIN_HEIGHT)
         self._page_card.body.addWidget(host)
@@ -380,7 +369,7 @@ class SettingsScreen(QWidget):
         row.addWidget(self._master)
 
         row, _ = self._row("Срок годности истёк", "Напоминать о просроченных товарах")
-        self._expired = Toggle(self._user.notify_expired, self._on_expired)
+        self._expired = Toggle(self._user.notify_expired, self._on_flag)
         row.addWidget(self._expired)
 
         row, self._days_hint = self._row("Скоро истекает срок", DAYS_HINT)
@@ -400,7 +389,7 @@ class SettingsScreen(QWidget):
         row.addWidget(self._expiring)
 
         row, self._low_hint = self._row("Низкий остаток", THRESHOLD_HINT)
-        self._low = Toggle(self._user.notify_low_stock, self._on_low)
+        self._low = Toggle(self._user.notify_low_stock, self._on_flag)
         self._caption(row, "меньше")
         self._threshold = TextField(
             width=FIELD_WIDTH, justify="center", on_change=self._threshold_edited
@@ -418,19 +407,9 @@ class SettingsScreen(QWidget):
         return str(int(value)) if value == int(value) else str(value)
 
     @property
-    def master_toggle(self) -> Toggle:
-        """Общий выключатель уведомлений."""
-        return self._master
-
-    @property
     def expired_toggle(self) -> Toggle:
         """Переключатель «Срок годности истёк»."""
         return self._expired
-
-    @property
-    def expiring_toggle(self) -> Toggle:
-        """Переключатель «Скоро истекает срок»."""
-        return self._expiring
 
     @property
     def low_toggle(self) -> Toggle:
@@ -465,11 +444,8 @@ class SettingsScreen(QWidget):
         self._prefs.set(self._user.id, "notify_enabled", value)
         self._after_notify_change()
 
-    def _on_expired(self, _value: bool) -> None:
-        self._save_flags()
-        self._after_notify_change()
-
-    def _on_low(self, _value: bool) -> None:
+    def _on_flag(self, _value: bool) -> None:
+        """Переключатели «истёк» и «низкий остаток» хранятся в базе."""
         self._save_flags()
         self._after_notify_change()
 
@@ -496,7 +472,7 @@ class SettingsScreen(QWidget):
             value = float(text)
         except ValueError:
             value = -1
-        if value < 0:
+        if not value >= 0:
             self._threshold.set_error()
             self._set_hint(self._low_hint, "Введите число, не меньше нуля", "red")
             return
@@ -513,18 +489,18 @@ class SettingsScreen(QWidget):
 
     def _build_data(self) -> None:
         row, _ = self._row("Экспорт данных", "Все товары аптечки в файл", first=True)
-        for fmt, title in EXPORT_FORMATS:
+        for fmt, title in FILE_FORMATS:
             row.addWidget(Button(title, lambda f=fmt: self._export(f), size="sm"))
             row.addSpacing(4)
         row, _ = self._row("Импорт данных", "Добавить товары из файла")
-        for fmt, title in IMPORT_FORMATS:
+        for _fmt, title in FILE_FORMATS:
             row.addWidget(Button(title, self._import, size="sm"))
             row.addSpacing(4)
         row, _ = self._row(
             "Шаблон для импорта", "Файл для заполнения: столбцы, примеры и подсказки"
         )
         self.template_buttons = {}
-        for fmt, title in IMPORT_FORMATS:
+        for fmt, title in FILE_FORMATS:
             button = Button(title, lambda f=fmt: self._save_template(f), size="sm")
             self.template_buttons[fmt] = button
             row.addWidget(button)
@@ -555,9 +531,12 @@ class SettingsScreen(QWidget):
         try:
             self._services.data.write_template(path, fmt)
         except (ValidationError, OSError) as error:
-            self._info("Не удалось сохранить", str(getattr(error, "message", error)))
+            self._save_failed(error)
             return
         self._show_notice("Шаблон сохранён")
+
+    def _save_failed(self, error: Exception) -> None:
+        self._info("Не удалось сохранить", str(getattr(error, "message", error)))
 
     def _choose_open_path(self) -> str:
         path, _ = QFileDialog.getOpenFileName(
@@ -586,7 +565,7 @@ class SettingsScreen(QWidget):
         try:
             count = self._services.data.export_products(self._user.id, path, fmt)
         except (ValidationError, OSError) as error:
-            self._info("Не удалось сохранить", str(getattr(error, "message", error)))
+            self._save_failed(error)
             return
         self._show_notice(f"Сохранено товаров: {count}")
 
@@ -803,9 +782,7 @@ class _FormModal(Modal):
     def _show_error(self, error: ValidationError) -> None:
         for field in self.fields.values():
             field.clear_error()
-        target = self.fields.get(error.field or "")
-        if target is None:
-            target = next(iter(self.fields.values()))
+        target = self.fields.get(error.field or "") or next(iter(self.fields.values()))
         target.set_error(error.message)
         target.focus_field()
 
@@ -836,11 +813,7 @@ class ProfileModal(_FormModal):
         self.fields[key].set(getattr(user, key))
 
     def _submit(self) -> None:
-        values = {
-            "username": self._user.username,
-            "login": self._user.login,
-            "email": self._user.email,
-        }
+        values = {key: getattr(self._user, key) for key in PROFILE_FIELDS}
         values[self._key] = self.fields[self._key].get()
         try:
             user = self._services.settings.update_profile(

@@ -15,7 +15,7 @@ from pharmacy.ui.widgets.field import (
     TEXT_INSET,
     LabeledBox,
 )
-from pharmacy.ui.widgets.popup import Option, PopupList
+from pharmacy.ui.widgets.popup import Option, PopupList, Stage
 from pharmacy.ui.theme import palette
 
 OptionLike = Union[str, Option]
@@ -94,12 +94,14 @@ class Select(LabeledBox):
     def set(self, value: object) -> None:
         """Выбирает вариант по значению."""
         self._value = value
-        self._fit_width()
-        self.frame.update()
+        self._refresh()
 
     def set_options(self, options: Sequence[OptionLike]) -> None:
         """Заменяет список вариантов."""
         self._choices = normalize(options)
+        self._refresh()
+
+    def _refresh(self) -> None:
         self._fit_width()
         self.frame.update()
 
@@ -109,10 +111,7 @@ class Select(LabeledBox):
         return self._prefix + text if text else self._placeholder
 
     def _label_of(self, value: object) -> str:
-        for item, text in self._choices:
-            if item == value:
-                return text
-        return ""
+        return next((text for item, text in self._choices if item == value), "")
 
     def _fit_width(self) -> None:
         """Подгоняет ширину фильтра под выбранное значение (как в макете)."""
@@ -130,25 +129,30 @@ class Select(LabeledBox):
         """Открытый сейчас список или None."""
         return self._popup
 
+    def _stage(self) -> Stage:
+        """Что показать в списке: варианты, выбранное, обработчики выбора."""
+        return self._choices, self._value, self._pick, None
+
     def frame_pressed(self, _event) -> None:
         if self._popup is not None:
             self._popup.close_list()
             return
+        options, selected, on_pick, on_stage = self._stage()
         self._popup = PopupList(
             self.frame,
-            self._choices,
-            self._value,
-            self._pick,
+            options,
+            selected,
+            on_pick,
             self._closed,
             self.frame.box_rect(),
+            on_stage,
         )
         self.frame.update()  # рамка становится голубой, пока список открыт
 
     def _pick(self, value: object) -> None:
         self._value = value
         self.clear_error()
-        self._fit_width()
-        self.frame.update()
+        self._refresh()
         if self._on_change is not None:
             self._on_change(value)
 
@@ -171,12 +175,7 @@ class Select(LabeledBox):
         painter.setFont(font("body"))
         painter.setPen(qcolor(color))
         painter.drawText(
-            QRectF(
-                box.left() + self._inset,
-                box.top(),
-                box.width() - self._inset,
-                box.height(),
-            ),
+            box.adjusted(self._inset, 0, 0, 0),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             self.shown_text(),
         )

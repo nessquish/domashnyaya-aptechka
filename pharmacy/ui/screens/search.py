@@ -18,7 +18,6 @@ from pharmacy.ui.search_index import (
     NOTIFICATION,
     PRODUCT,
     SHOPPING,
-    SearchEntry,
     Target,
     search_sections,
 )
@@ -144,15 +143,9 @@ class SearchModal(Modal):
         self.rows = []
         self.group_titles = []
         self.active_index = -1
-        if not query:
-            self._message(HINT_TEXT)
-            QTimer.singleShot(0, self._fit_height)
-            return
-        found = self._collect(query)
+        found = self._collect(query) if query else []
         if not found:
-            self._message(EMPTY_TEXT)
-            QTimer.singleShot(0, self._fit_height)
-            return
+            self._message(EMPTY_TEXT if query else HINT_TEXT)
         for title, rows in found:
             self._group(title)
             for row_title, caption, target in rows:
@@ -167,78 +160,58 @@ class SearchModal(Modal):
         в списке покупок, уведомлениях или истории, то и там.
         """
         services, user_id = self._services, self._user_id
-        groups = []
         products = services.products.search_products(user_id, query, MAX_RESULTS)
-        if products:
-            groups.append(
-                (
-                    "Моя аптечка",
-                    [
-                        (p.name, self._product_caption(p), Target(PRODUCT, p.id))
-                        for p in products
-                    ],
-                )
-            )
-            groups.append(
-                (
-                    "Карточка товара",
-                    [
-                        (
-                            p.name,
-                            "Открыть карточку: " + p.category_name,
-                            Target(CARD, p.id),
-                        )
-                        for p in products
-                    ],
-                )
-            )
         shopping = services.shopping.search_items(user_id, query, MAX_RESULTS)
-        if shopping:
-            groups.append(
-                (
-                    "Список покупок",
-                    [
-                        (i.name, self._shopping_caption(i), Target(SHOPPING, i.id))
-                        for i in shopping
-                    ],
-                )
-            )
         notifications = services.notifications.search(user_id, query, MAX_RESULTS)
-        if notifications:
-            groups.append(
-                (
-                    "Уведомления",
-                    [
-                        (
-                            KIND_LABELS.get(n.kind, "Уведомление"),
-                            n.message,
-                            Target(NOTIFICATION, n.id),
-                        )
-                        for n in notifications
-                    ],
-                )
-            )
         records = services.history.search(user_id, query, MAX_RESULTS)
-        if records:
-            groups.append(
-                (
-                    "История",
-                    [
-                        (
-                            ACTION_LABELS.get(r.action, "Действие"),
-                            f"{r.description} · {r.created_at[:16]}",
-                            Target(HISTORY, query),
-                        )
-                        for r in records
-                    ],
-                )
-            )
         entries = search_sections(query, MAX_RESULTS)
-        if entries:
-            groups.append(
-                (SECTIONS_TITLE, [(e.title, e.path, e.target) for e in entries])
-            )
-        return groups
+        groups = [
+            (
+                "Моя аптечка",
+                [
+                    (p.name, self._product_caption(p), Target(PRODUCT, p.id))
+                    for p in products
+                ],
+            ),
+            (
+                "Карточка товара",
+                [
+                    (p.name, "Открыть карточку: " + p.category_name, Target(CARD, p.id))
+                    for p in products
+                ],
+            ),
+            (
+                "Список покупок",
+                [
+                    (i.name, self._shopping_caption(i), Target(SHOPPING, i.id))
+                    for i in shopping
+                ],
+            ),
+            (
+                "Уведомления",
+                [
+                    (
+                        KIND_LABELS.get(n.kind, "Уведомление"),
+                        n.message,
+                        Target(NOTIFICATION, n.id),
+                    )
+                    for n in notifications
+                ],
+            ),
+            (
+                "История",
+                [
+                    (
+                        ACTION_LABELS.get(r.action, "Действие"),
+                        f"{r.description} · {r.created_at[:16]}",
+                        Target(HISTORY, query),
+                    )
+                    for r in records
+                ],
+            ),
+            (SECTIONS_TITLE, [(e.title, e.path, e.target) for e in entries]),
+        ]
+        return [(title, rows) for title, rows in groups if rows]
 
     @staticmethod
     def _shopping_caption(item) -> str:
@@ -261,13 +234,9 @@ class SearchModal(Modal):
 
     @staticmethod
     def _product_caption(product: Product) -> str:
-        text = (
-            f"{product.category_name} · {format_quantity(product.quantity)}"
-            f" {product.unit}"
-        )
-        if product.note:
-            text += f" · {product.note}"
-        return text
+        quantity = f"{format_quantity(product.quantity)} {product.unit}"
+        parts = [product.category_name, quantity, product.note]
+        return " · ".join(part for part in parts if part)
 
     def _message(self, text: str) -> None:
         message = label(text, "body", "ink_3")
@@ -281,9 +250,6 @@ class SearchModal(Modal):
         heading = label(title, "small_medium", "ink_3")
         pad(heading, 12, 10, 0, 4)
         self._results.addWidget(heading)
-
-    def _add_entry(self, entry: SearchEntry) -> None:
-        self._add(entry.title, entry.path, entry.target)
 
     def _add(self, title: str, caption: str, target: Target) -> None:
         row = _ResultRow(title, caption, target, self.choose)

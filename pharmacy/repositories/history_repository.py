@@ -43,13 +43,12 @@ class HistoryRepository(BaseRepository):
         Returns:
             Идентификатор новой записи.
         """
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "INSERT INTO history (user_id, product_id, action, description)"
-                " VALUES (?, ?, ?, ?)",
-                (user_id, product_id, action, description),
-            )
-            return cursor.lastrowid
+        return self._insert(
+            "INSERT INTO history (user_id, product_id, action, description)"
+            " VALUES (?, ?, ?, ?)",
+            (user_id, product_id, action, description),
+            conn,
+        )
 
     def list_for_user(
         self,
@@ -85,6 +84,4 @@ class HistoryRepository(BaseRepository):
 
     def delete_all(self, user_id: int) -> int:
         """Очищает историю пользователя и возвращает число удалённых записей."""
-        with self._connection() as c:
-            cursor = c.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
-            return cursor.rowcount
+        return self._change("DELETE FROM history WHERE user_id = ?", (user_id,))

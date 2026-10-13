@@ -18,10 +18,6 @@ NO_ACCOUNT = "Аккаунт с таким логином или почтой н
 WRONG_PASSWORD = "Неверный пароль"
 
 
-NO_ACCOUNT = "Аккаунт с таким логином или почтой не найден"
-WRONG_PASSWORD = "Неверный пароль"
-
-
 class AuthService:
     """Правила работы с учётными записями."""
 
@@ -92,10 +88,8 @@ class AuthService:
             raise ValidationError("Введите логин или эл. почту", "login")
         if not password:
             raise ValidationError("Введите пароль", "password")
-        if "@" in login:
-            user = self._users.get_by_email(login)
-        else:
-            user = self._users.get_by_login(login)
+        find = self._users.get_by_email if "@" in login else self._users.get_by_login
+        user = find(login)
         if user is None:
             raise AuthenticationError(NO_ACCOUNT, "login")
         if not verify_password(password, user.password_hash):

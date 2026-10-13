@@ -30,6 +30,16 @@ def format_user_date(value: Optional[date]) -> str:
     return value.strftime(USER_DATE_FORMAT) if value else ""
 
 
+def stored_date(created_at: str) -> date:
+    """Дата из строки базы «ГГГГ-ММ-ДД ЧЧ:ММ:СС» (время отбрасывается)."""
+    return date.fromisoformat(created_at[:10])
+
+
+def format_created(created_at: str) -> str:
+    """Дату добавления из базы показывает как ДД.ММ.ГГГГ."""
+    return format_user_date(stored_date(created_at))
+
+
 def days_until(target: date, today: Optional[date] = None) -> int:
     """Считает, сколько дней осталось до даты.
 

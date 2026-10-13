@@ -1,6 +1,6 @@
 """Экран «История» (макет Figma, экран 12): действия, сгруппированные по дням."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from PySide6.QtCore import QTimer, Qt
@@ -9,11 +9,9 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from pharmacy.models import HistoryRecord
 from pharmacy.ui.fonts import line_height
 from pharmacy.ui.widgets.button import Button
-from pharmacy.ui.paging import fit_scroll
-from pharmacy.ui.widgets.card import Card
-from pharmacy.ui.widgets.scroll import ScrollArea
+from pharmacy.ui.screens.listscreen import ScrollListScreen
 from pharmacy.ui.widgets.dialog import Dialog
-from pharmacy.ui.widgets.common import Line, clear_layout, label, pad
+from pharmacy.ui.widgets.common import Line, clear_layout, empty_message, label, pad
 from pharmacy.ui.widgets.field import TextField
 from pharmacy.ui.widgets.iconbox import IconBox
 from pharmacy.ui.widgets.page import PageHeader
@@ -21,7 +19,7 @@ from pharmacy.ui.widgets.select import Select
 from pharmacy.services.history_service import ACTION_LABELS
 from pharmacy.ui import labels, periods
 from pharmacy.ui.theme import SHADOW_PAD
-from pharmacy.utils.dates import format_user_date
+from pharmacy.utils.dates import format_user_date, stored_date
 
 if TYPE_CHECKING:
     from pharmacy.ui.screens.shell import MainShell
@@ -46,19 +44,15 @@ def group_by_day(records: List[HistoryRecord]) -> Dict[date, List[HistoryRecord]
     """Раскладывает записи по дням, сохраняя порядок (новые дни и записи первыми)."""
     groups: Dict[date, List[HistoryRecord]] = {}
     for record in records:
-        day = datetime.strptime(record.created_at[:10], "%Y-%m-%d").date()
-        groups.setdefault(day, []).append(record)
+        groups.setdefault(stored_date(record.created_at), []).append(record)
     return groups
 
 
-class HistoryScreen(QWidget):
+class HistoryScreen(ScrollListScreen):
     """Лента действий с поиском по товару и фильтрами по действию и периоду."""
 
     def __init__(self, shell: "MainShell") -> None:
-        super().__init__()
-        self._shell = shell
-        self._services = shell.services
-        self._user = shell.user
+        super().__init__(shell)
         self._query = ""
         self._action: Optional[str] = None
         self._period = periods.WEEK
@@ -66,9 +60,6 @@ class HistoryScreen(QWidget):
         self._timer.setSingleShot(True)
         self._timer.setInterval(SEARCH_DELAY_MS)
         self._timer.timeout.connect(self._apply_search)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
         header = PageHeader("История")
         gap = 8 - 2 * SHADOW_PAD
         self._search = TextField(
@@ -92,14 +83,8 @@ class HistoryScreen(QWidget):
             "Очистить историю", self._confirm_clear, variant="danger"
         )
         header.actions.addWidget(self.clear_button, 0, Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(header)
-        self._card = Card()
-        # Листается только список внутри карточки, шапка и кнопки остаются.
-        self._scroll = ScrollArea(gutter=8)
-        self._list = self._scroll.body
-        self._card.body.addWidget(self._scroll)
-        layout.addWidget(self._card)
-        layout.addStretch(1)
+        self._layout.addWidget(header)
+        self._add_list_card()
         self._reload()
 
     # --- данные ---
@@ -126,17 +111,6 @@ class HistoryScreen(QWidget):
             records = [r for r in records if needle in r.description.casefold()]
         return records
 
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        QTimer.singleShot(0, self.fit_rows)
-
-    def fit_rows(self) -> None:
-        """Подгоняет высоту списка под окно (вызывается и при смене размера окна)."""
-        try:
-            fit_scroll(self, self._card, self._scroll, self._shell.viewport_height())
-        except RuntimeError:  # экран уже закрыт
-            pass
-
     def _reload(self) -> None:
         QTimer.singleShot(40, self.fit_rows)  # после того, как строки покажутся
         self._events: List[QWidget] = []
@@ -149,10 +123,7 @@ class HistoryScreen(QWidget):
                 bool(self._services.history.list_history(self._user.id, limit=1))
             )
             if not groups:
-                message = label(EMPTY_TEXT, "body", "ink_3")
-                message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                pad(message, 0, 40, 0, 40)
-                self._list.addWidget(message)
+                self._list.addWidget(empty_message(EMPTY_TEXT))
                 return
             for day, records in groups.items():
                 self._day(day)
@@ -165,9 +136,8 @@ class HistoryScreen(QWidget):
 
     def _separator(self) -> None:
         row = QHBoxLayout()
-        row.setContentsMargins(
-            PADDING_X - self._card.inner_inset, 0, PADDING_X - self._card.inner_inset, 0
-        )
+        side = PADDING_X - self._card.inner_inset
+        row.setContentsMargins(side, 0, side, 0)
         row.addWidget(Line("line_soft"))
         self._list.addLayout(row)
 

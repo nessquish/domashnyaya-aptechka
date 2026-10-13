@@ -6,7 +6,7 @@ from typing import List, Optional
 from pharmacy.db.connection import Database
 from pharmacy.models import HistoryAction, HistoryRecord
 from pharmacy.repositories.history_repository import HistoryRepository
-from pharmacy.utils.textmatch import name_matches
+from pharmacy.utils.textmatch import find_matching
 
 # Подписи видов действий для фильтра в интерфейсе.
 ACTION_LABELS = {
@@ -49,12 +49,8 @@ class HistoryService:
 
     def search(self, user_id: int, query: str, limit: int = 10) -> List[HistoryRecord]:
         """Ищет записи истории по описанию (в нём есть название товара)."""
-        found = [
-            record
-            for record in self._history.list_for_user(user_id)
-            if name_matches(record.description, query)
-        ]
-        return found[:limit]
+        records = self._history.list_for_user(user_id)
+        return find_matching(records, lambda record: record.description, query, limit)
 
     def clear(self, user_id: int) -> int:
         """Очищает историю пользователя и возвращает число удалённых записей."""

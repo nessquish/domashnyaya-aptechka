@@ -39,9 +39,8 @@ class Highlight(QWidget):
         self._color = color
         self.backdrop_color = color
         self.body = QVBoxLayout(self)
-        self.body.setContentsMargins(
-            self.padding_x, self.padding_y, self.padding_x, self.padding_y
-        )
+        x, y = self.padding_x, self.padding_y
+        self.body.setContentsMargins(x, y, x, y)
         self.body.setSpacing(0)
 
     def paintEvent(self, _event) -> None:

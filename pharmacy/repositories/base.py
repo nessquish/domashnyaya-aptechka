@@ -40,3 +40,13 @@ class BaseRepository:
         else:
             with self.db.transaction() as own:
                 yield own
+
+    def _insert(self, sql: str, params: tuple, conn=None) -> int:
+        """Выполняет вставку и возвращает идентификатор новой строки."""
+        with self._connection(conn) as c:
+            return c.execute(sql, params).lastrowid
+
+    def _change(self, sql: str, params: tuple, conn=None) -> int:
+        """Выполняет изменение или удаление и возвращает число затронутых строк."""
+        with self._connection(conn) as c:
+            return c.execute(sql, params).rowcount

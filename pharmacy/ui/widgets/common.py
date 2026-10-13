@@ -149,6 +149,14 @@ class Line(QWidget):
         QPainter(self).fillRect(self.rect(), QColor(role_color(self._color)))
 
 
+def empty_message(text: str, margin: int = 40) -> QLabel:
+    """Серая подпись по центру для пустого списка («Записей нет»)."""
+    message = label(text, "body", "ink_3")
+    message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    pad(message, 0, margin, 0, margin)
+    return message
+
+
 def clear_layout(layout: QLayout) -> None:
     """Удаляет всё, что лежит в раскладке (виджеты и вложенные раскладки)."""
     while layout.count():
@@ -159,9 +167,3 @@ def clear_layout(layout: QLayout) -> None:
             widget.deleteLater()
         elif item.layout() is not None:
             clear_layout(item.layout())
-
-
-def fixed_height(widget: QWidget, height: int) -> None:
-    """Фиксирует высоту виджета, ширину оставляет гибкой."""
-    widget.setFixedHeight(height)
-    widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)

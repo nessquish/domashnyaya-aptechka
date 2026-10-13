@@ -153,9 +153,8 @@ class App(QMainWindow):
         try:
             user = self.services.settings.get_user(user_id)
         except NotFoundError:
-            self.remembered.clear()
-            return False
-        if not self.remembered.matches(user.password_hash):
+            user = None
+        if user is None or not self.remembered.matches(user.password_hash):
             self.remembered.clear()
             return False
         self.sign_in(user)
@@ -215,11 +214,8 @@ class App(QMainWindow):
         Хранится в preferences под ``GLOBAL_USER``. По умолчанию — системная.
         """
         mode = self.preferences.get(GLOBAL_USER, THEME_MODE, SYSTEM_THEME)
-        return (
-            mode
-            if mode in (theme.LIGHT_THEME, theme.DARK_THEME, SYSTEM_THEME)
-            else SYSTEM_THEME
-        )
+        known = (theme.LIGHT_THEME, theme.DARK_THEME, SYSTEM_THEME)
+        return mode if mode in known else SYSTEM_THEME
 
     def resolve_theme(self, user: User) -> str:
         """Тема, которую нужно показать: при выборе «Системная» берётся тема системы."""

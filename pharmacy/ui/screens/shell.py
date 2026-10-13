@@ -49,6 +49,15 @@ THEME_MODE = "theme_mode"  # light, dark или system (как в операци
 # Содержимое окна отступает от краёв на отступ макета минус поле под тень карточек.
 CONTENT_PADDING_X = theme.CONTENT_PADDING_X - CARD_SHADOW_PAD
 
+# Куда ведёт результат поиска: раздел, его экран, метод экрана и тип значения.
+_TARGETS = {
+    SETTINGS: (sections.SETTINGS, SettingsScreen, "open_section", str),
+    PRODUCT: (sections.MY_KIT, MyKitScreen, "reveal", int),
+    SHOPPING: (sections.SHOPPING, ShoppingScreen, "reveal", int),
+    NOTIFICATION: (sections.NOTIFICATIONS, NotificationsScreen, "reveal", int),
+    HISTORY: (sections.HISTORY, HistoryScreen, "show_query", str),
+}
+
 
 class _Rail(QFrame):
     """Узкая полоса с кнопкой «развернуть», которая остаётся от свёрнутой панели."""
@@ -130,11 +139,7 @@ class MainShell(QWidget):
             self.confirm_logout,
             self.toggle_theme,
             lambda: self.set_sidebar_collapsed(True),
-            icons=(
-                sections.ICONS
-                if self.app.preferences.get(self.user.id, MENU_ICONS, True)
-                else None
-            ),
+            icons=sections.ICONS if self._icons_enabled() else None,
             on_profile=self.open_profile,
             on_search=self.app.open_search,
         )
@@ -154,6 +159,9 @@ class MainShell(QWidget):
         content.addWidget(self._scroll)
         row.addLayout(content, 1)
         self.navigate(start)
+
+    def _icons_enabled(self) -> bool:
+        return bool(self.app.preferences.get(self.user.id, MENU_ICONS, True))
 
     def viewport_height(self) -> int:
         """Высота видимой области раздела."""
@@ -193,34 +201,17 @@ class MainShell(QWidget):
         """Переходит к результату поиска: раздел, настройка или товар."""
         if target.kind == SECTION:
             self.navigate(str(target.value))
-        elif target.kind == SETTINGS:
-            self.navigate(sections.SETTINGS)
-            if isinstance(self._current, SettingsScreen):
-                self._current.open_section(str(target.value))
-        elif target.kind == PRODUCT:
-            self.navigate(sections.MY_KIT)
-            if isinstance(self._current, MyKitScreen):
-                self._current.reveal(int(target.value))
         elif target.kind == CARD:
             self.open_product(int(target.value))
-        elif target.kind == SHOPPING:
-            self.navigate(sections.SHOPPING)
-            if isinstance(self._current, ShoppingScreen):
-                self._current.reveal(int(target.value))
-        elif target.kind == NOTIFICATION:
-            self.navigate(sections.NOTIFICATIONS)
-            if isinstance(self._current, NotificationsScreen):
-                self._current.reveal(int(target.value))
-        elif target.kind == HISTORY:
-            self.navigate(sections.HISTORY)
-            if isinstance(self._current, HistoryScreen):
-                self._current.show_query(str(target.value))
+        elif target.kind in _TARGETS:
+            section, screen, method, convert = _TARGETS[target.kind]
+            self.navigate(section)
+            if isinstance(self._current, screen):
+                getattr(self._current, method)(convert(target.value))
 
     def open_profile(self) -> None:
         """Открывает профиль пользователя: настройки, раздел «Аккаунт»."""
-        self.navigate(sections.SETTINGS)
-        if isinstance(self._current, SettingsScreen):
-            self._current.open_section(ACCOUNT)
+        self.go_to(Target(SETTINGS, ACCOUNT))
 
     def set_text_size(self, name: str) -> None:
         """Запоминает размер текста и сразу применяет его (окно строится заново)."""

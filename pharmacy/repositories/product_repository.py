@@ -101,14 +101,13 @@ class ProductRepository(BaseRepository):
         Returns:
             Идентификатор нового товара.
         """
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "INSERT INTO products (user_id, category_id, name, quantity, unit,"
-                " expiry_date, indications, storage_place, min_quantity, note)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (user_id,) + _values(data),
-            )
-            return cursor.lastrowid
+        return self._insert(
+            "INSERT INTO products (user_id, category_id, name, quantity, unit,"
+            " expiry_date, indications, storage_place, min_quantity, note)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id,) + _values(data),
+            conn,
+        )
 
     def get(self, user_id: int, product_id: int) -> Optional[Product]:
         """Находит товар пользователя по идентификатору.
@@ -179,14 +178,13 @@ class ProductRepository(BaseRepository):
         Returns:
             True, если товар найден и обновлён.
         """
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "UPDATE products SET category_id = ?, name = ?, quantity = ?,"
-                " unit = ?, expiry_date = ?, indications = ?, storage_place = ?,"
-                " min_quantity = ?, note = ? WHERE id = ? AND user_id = ?",
-                _values(data) + (product_id, user_id),
-            )
-            return cursor.rowcount > 0
+        return 0 < self._change(
+            "UPDATE products SET category_id = ?, name = ?, quantity = ?,"
+            " unit = ?, expiry_date = ?, indications = ?, storage_place = ?,"
+            " min_quantity = ?, note = ? WHERE id = ? AND user_id = ?",
+            _values(data) + (product_id, user_id),
+            conn,
+        )
 
     def delete(
         self,
@@ -204,9 +202,8 @@ class ProductRepository(BaseRepository):
         Returns:
             True, если товар найден и удалён.
         """
-        with self._connection(conn) as c:
-            cursor = c.execute(
-                "DELETE FROM products WHERE id = ? AND user_id = ?",
-                (product_id, user_id),
-            )
-            return cursor.rowcount > 0
+        return 0 < self._change(
+            "DELETE FROM products WHERE id = ? AND user_id = ?",
+            (product_id, user_id),
+            conn,
+        )

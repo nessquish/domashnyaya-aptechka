@@ -14,10 +14,14 @@ from pharmacy.ui.icons import icon_pixmap
 from pharmacy.ui.paint import begin, fill_rounded
 from pharmacy.ui.widgets.badge import Badge, measure_badge
 from pharmacy.ui.widgets.button import Button, button_height, measure_button
-from pharmacy.ui.paging import fit_scroll
-from pharmacy.ui.widgets.card import Card
-from pharmacy.ui.widgets.scroll import ScrollArea
-from pharmacy.ui.widgets.common import Line, clear_layout, clickable, label, pad
+from pharmacy.ui.screens.listscreen import ScrollListScreen
+from pharmacy.ui.widgets.common import (
+    Line,
+    clear_layout,
+    clickable,
+    empty_message,
+    label,
+)
 from pharmacy.ui.widgets.controls import Segmented
 from pharmacy.ui.widgets.highlight import Highlight
 from pharmacy.ui.widgets.iconbox import IconBox
@@ -83,21 +87,15 @@ class _Row(Highlight):
             self._dot.move(self.padding_x, (self.height() - DOT) // 2)
 
 
-class NotificationsScreen(QWidget):
+class NotificationsScreen(ScrollListScreen):
     """Список уведомлений с вкладками, периодом и действиями."""
 
     def __init__(self, shell: "MainShell") -> None:
-        super().__init__()
-        self._shell = shell
-        self._services = shell.services
-        self._user = shell.user
+        super().__init__(shell)
         self._tab = 0
         self._rows = {}
         self._measure_actions()
         self._period = periods.ALL_TIME
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
         header = PageHeader("Уведомления")
         self.period_select = Select(
             periods.PERIODS, self._period, compact=True, on_change=self._on_period
@@ -106,39 +104,24 @@ class NotificationsScreen(QWidget):
         header.actions.addSpacing(8 - 2 * SHADOW_PAD)
         self.read_all_button = Button("Прочитать все", command=self._read_all)
         header.actions.addWidget(self.read_all_button)
-        layout.addWidget(header)
-        layout.addLayout(self._build_tabs())
-        self._card = Card()
-        # Листается только список внутри карточки, шапка и кнопки остаются.
-        self._scroll = ScrollArea(gutter=8)
-        self._list = self._scroll.body
-        self._card.body.addWidget(self._scroll)
-        layout.addWidget(self._card)
-        layout.addStretch(1)
+        self._layout.addWidget(header)
+        self._layout.addLayout(self._build_tabs())
+        self._add_list_card()
         self._reload()
 
     # --- вкладки ---
 
     def _build_tabs(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.setContentsMargins(
-            CARD_SHADOW_PAD - SHADOW_PAD,
-            12 - SHADOW_PAD,
-            CARD_SHADOW_PAD,
-            12 - SHADOW_PAD,
-        )
+        gap = 12 - SHADOW_PAD
+        row.setContentsMargins(CARD_SHADOW_PAD - SHADOW_PAD, gap, CARD_SHADOW_PAD, gap)
         row.setSpacing(0)
         self._tabs = Segmented(self._tab_labels(), self._tab, self._on_tab)
         row.addWidget(self._tabs)
         row.addStretch(1)
         days = self._user.warning_days
-        row.addWidget(
-            label(
-                f"Предупреждение о сроке — за {days} дн. (меняется в Настройках)",
-                "small",
-                "ink_3",
-            )
-        )
+        hint = f"Предупреждение о сроке — за {days} дн. (меняется в Настройках)"
+        row.addWidget(label(hint, "small", "ink_3"))
         return row
 
     def _tab_labels(self) -> List[str]:
@@ -174,25 +157,13 @@ class NotificationsScreen(QWidget):
 
     def _visible(self) -> List[Notification]:
         _label, kind, unread_only = TABS[self._tab]
-        items = self._period_items()
-        if unread_only:
-            items = [item for item in items if not item.is_read]
-        if kind == "expiry":
-            items = [item for item in items if item.kind in EXPIRY_KINDS]
-        elif kind is not None:
-            items = [item for item in items if item.kind == kind]
-        return items
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        QTimer.singleShot(0, self.fit_rows)
-
-    def fit_rows(self) -> None:
-        """Подгоняет высоту списка под окно (вызывается и при смене размера окна)."""
-        try:
-            fit_scroll(self, self._card, self._scroll, self._shell.viewport_height())
-        except RuntimeError:  # экран уже закрыт
-            pass
+        kinds = EXPIRY_KINDS if kind == "expiry" else (kind,)
+        return [
+            item
+            for item in self._period_items()
+            if (item.kind in kinds or kind is None)
+            and (not item.is_read or not unread_only)
+        ]
 
     def reveal(self, notification_id: int) -> None:
         """Показывает все уведомления и прокручивает список к нужному."""
@@ -215,10 +186,7 @@ class NotificationsScreen(QWidget):
             self._rows = {}
             items = self._visible()
             if not items:
-                message = label(EMPTY_TEXT, "body", "ink_3")
-                message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                pad(message, 0, 40, 0, 40)
-                self._list.addWidget(message)
+                self._list.addWidget(empty_message(EMPTY_TEXT))
             for index, item in enumerate(items):
                 if index:
                     self._list.addWidget(Line("line"))

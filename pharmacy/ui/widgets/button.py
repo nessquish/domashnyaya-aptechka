@@ -58,10 +58,9 @@ def _colors(variant: str) -> Tuple[str, str, str]:
 def _shadows(variant: str) -> Tuple[Shadow, ...]:
     """Тени кнопки: у цветных кнопок тень того же цвета."""
     pal = palette()
-    if variant == "primary":
-        return (Shadow(3, 8, pal.primary, 0.28), Shadow(1, 2, pal.primary, 0.12))
-    if variant == "danger_solid":
-        return (Shadow(3, 8, pal.red, 0.28), Shadow(1, 2, pal.red, 0.12))
+    tint = {"primary": pal.primary, "danger_solid": pal.red}.get(variant)
+    if tint:
+        return (Shadow(3, 8, tint, 0.28), Shadow(1, 2, tint, 0.12))
     return (Shadow(1, 3, pal.shadow, 0.08), Shadow(2, 6, pal.shadow, 0.05))
 
 
@@ -171,12 +170,8 @@ class Button(QAbstractButton):
             return tuple(mix(c, bg, DISABLED_SHARE) for c in (fill, border, ink))
         if self.isDown() or self.underMouse():
             share = PRESSED_SHARE if self.isDown() else HOVER_SHARE
-            tint = (
-                "#000000"
-                if self._variant in ("primary", "danger_solid")
-                else palette().primary
-            )
-            fill = mix(fill, tint, share)
+            solid = self._variant in ("primary", "danger_solid")
+            fill = mix(fill, "#000000" if solid else palette().primary, share)
         return fill, border, ink
 
     def paintEvent(self, _event) -> None:

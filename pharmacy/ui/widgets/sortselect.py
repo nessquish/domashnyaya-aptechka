@@ -12,7 +12,7 @@ from pharmacy.ui.sorting import (
     kind_of,
     label_of,
 )
-from pharmacy.ui.widgets.popup import Option, PopupList, Stage
+from pharmacy.ui.widgets.popup import Option, Stage
 from pharmacy.ui.widgets.select import Select
 
 BACK = "__back__"
@@ -54,23 +54,10 @@ class SortSelect(Select):
             parent=parent,
         )
 
-    def frame_pressed(self, _event) -> None:
-        if self._popup is not None:
-            self._popup.close_list()
-            return
-        kinds, current, on_pick, on_stage = self._kinds_stage()
-        self._popup = PopupList(
-            self.frame,
-            kinds,
-            current,
-            on_pick,
-            self._closed,
-            self.frame.box_rect(),
-            on_stage,
-        )
-        self.frame.update()
-
     # --- две ступени списка ---
+
+    def _stage(self) -> Stage:
+        return self._kinds_stage()
 
     def _kinds_stage(self) -> Stage:
         kinds: List[Option] = [(kind.key, kind.label) for kind in SORT_KINDS]
@@ -89,8 +76,3 @@ class SortSelect(Select):
         if value == BACK:
             return self._kinds_stage()
         return None
-
-    @property
-    def popup_options(self) -> List[Option]:
-        """Варианты, которые показаны в открытом списке (пусто, если он закрыт)."""
-        return self._popup.options if self._popup is not None else []
