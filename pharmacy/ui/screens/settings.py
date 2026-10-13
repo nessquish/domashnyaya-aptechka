@@ -1,15 +1,12 @@
 """Экран «Настройки»: слева список разделов, справа содержимое выбранного."""
 
-import os
-import sys
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
-from PySide6.QtCore import QPoint, QProcess, Qt, QTimer, QUrl
+from PySide6.QtCore import QPoint, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
-    QApplication,
     QLabel,
     QVBoxLayout,
     QWidget,
@@ -17,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from pharmacy import GITHUB_URL, __build_date__, __developer__, __version__
 from pharmacy.errors import NotFoundError, ValidationError
-from pharmacy.ui import paging, scaling, sections, theme
+from pharmacy.ui import paging, runtime, scaling, sections, theme
 from pharmacy.ui.preferences import (
     GLOBAL_USER,
     MENU_ICONS,
@@ -337,18 +334,10 @@ class SettingsScreen(QWidget):
             "Масштаб меняется только при запуске. Перезапустить программу сейчас? "
             "Если устройство не запомнено, войти нужно будет заново.",
             "Перезапустить",
-            self._restart,
+            runtime.restart_program,
             cancel_text="Позже",
             width=420,
         )
-
-    def _restart(self) -> None:
-        """Запускает программу заново (с новым масштабом) и закрывает эту."""
-        # Масштаб текущего запуска не должен попасть в новый: он считается заново.
-        os.environ.pop(scaling.ENV_NAME, None)
-        args = [] if getattr(sys, "frozen", False) else ["-m", "pharmacy"]
-        QProcess.startDetached(sys.executable, args)
-        QApplication.quit()
 
     def _on_text_size(self, index: int) -> None:
         self._remember_section()

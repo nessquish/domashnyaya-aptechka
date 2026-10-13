@@ -5,11 +5,18 @@ import subprocess
 import sys
 from typing import Optional
 
-from PySide6.QtCore import QCoreApplication, QLibraryInfo, QLocale, QTranslator, Qt
+from PySide6.QtCore import (
+    QCoreApplication,
+    QLibraryInfo,
+    QLocale,
+    QProcess,
+    QTranslator,
+    Qt,
+)
 from PySide6.QtGui import QGuiApplication, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication
 
-from pharmacy.ui import fonts
+from pharmacy.ui import fonts, scaling
 from pharmacy.ui.icons import icon_pixmap
 from pharmacy.ui.paint import begin, fill_rounded
 from pharmacy.ui.theme import LIGHT
@@ -91,6 +98,14 @@ def _qt_theme() -> Optional[str]:
     if scheme == Qt.ColorScheme.Dark:
         return "dark"
     return "light" if scheme == Qt.ColorScheme.Light else None
+
+
+def restart_program() -> None:
+    """Запускает программу заново (масштаб считается заново) и закрывает эту."""
+    os.environ.pop(scaling.ENV_NAME, None)
+    args = [] if getattr(sys, "frozen", False) else ["-m", "pharmacy"]
+    QProcess.startDetached(sys.executable, args)
+    QApplication.quit()
 
 
 def system_theme() -> str:

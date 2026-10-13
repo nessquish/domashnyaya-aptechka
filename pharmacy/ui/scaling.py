@@ -22,6 +22,7 @@ MIN_MANUAL = 0.8  # границы ручного масштаба в настр
 MAX_MANUAL = 1.5
 
 _scale_factor = 1.0
+_manual_active = False  # применён масштаб пользователя, а не авто
 
 
 def compute_scale_factor(width: int, height: int) -> float:
@@ -96,7 +97,8 @@ def apply_scale_factor(manual: Optional[float] = None) -> float:
     Returns:
         Применённый коэффициент масштабирования.
     """
-    global _scale_factor
+    global _scale_factor, _manual_active
+    _manual_active = False
     forced = os.environ.get(ENV_NAME)
     if forced:
         try:
@@ -105,6 +107,7 @@ def apply_scale_factor(manual: Optional[float] = None) -> float:
             _scale_factor = 1.0
         return _scale_factor
     if manual:
+        _manual_active = True
         _scale_factor = round(max(MIN_MANUAL, min(manual, MAX_MANUAL)), 2)
         os.environ[ENV_NAME] = str(_scale_factor)
         return _scale_factor
@@ -116,6 +119,11 @@ def apply_scale_factor(manual: Optional[float] = None) -> float:
         _scale_factor = compute_scale_factor(*size)
         os.environ[ENV_NAME] = str(_scale_factor)
     return _scale_factor
+
+
+def manual_scale_active() -> bool:
+    """Идёт ли программа с ручным масштабом (а не с подобранным по экрану)."""
+    return _manual_active
 
 
 def scale_factor() -> float:

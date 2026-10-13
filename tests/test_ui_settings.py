@@ -2,7 +2,7 @@
 
 from unittest import mock
 
-from pharmacy.ui import sections, theme
+from pharmacy.ui import runtime, sections, theme
 from pharmacy.ui.preferences import GLOBAL_USER, MENU_ICONS, SCALE_MODE, SCALE_PERCENT
 from pharmacy.ui.screens.settings import (
     ABOUT,
@@ -408,13 +408,10 @@ class ScaleRestartTest(SettingsTestCase):
         import os
 
         os.environ["QT_SCALE_FACTOR"] = "0.8"
-        page = self.section(APPEARANCE)
         with mock.patch(
-            "pharmacy.ui.screens.settings.QProcess.startDetached"
-        ) as start, mock.patch(
-            "pharmacy.ui.screens.settings.QApplication.quit"
-        ) as quit_:
-            page._restart()
+            "pharmacy.ui.runtime.QProcess.startDetached"
+        ) as start, mock.patch("pharmacy.ui.runtime.QApplication.quit") as quit_:
+            runtime.restart_program()
         self.assertNotIn("QT_SCALE_FACTOR", os.environ)
         self.assertEqual(start.call_args[0][1], ["-m", "pharmacy"])
         quit_.assert_called_once()

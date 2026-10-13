@@ -1,11 +1,13 @@
 """Тесты окна приложения и экранов входа и регистрации."""
 
 import unittest
+from unittest import mock
 
 from PySide6.QtWidgets import QLabel, QWidget
 from shiboken6 import isValid
 
-from pharmacy.ui import theme
+from pharmacy.ui import runtime, scaling, theme
+from pharmacy.ui.preferences import GLOBAL_USER, SCALE_MODE, SCALE_PERCENT
 from pharmacy.ui.screens.auth import LoginScreen, RegisterScreen
 from pharmacy.ui.screens.shell import MainShell
 from tests.qt_helpers import AppTestCase, click, find_all, settle, type_text
@@ -510,6 +512,52 @@ class NavigationTest(AppTestCase):
         self.app.close()
         settle()
         self.assertFalse(self.app.isVisible())
+
+
+class ManualScaleLoginTest(AppTestCase):
+    """Вход и регистрация всегда в автомасштабе, ручной действует после входа."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.app.preferences.set(GLOBAL_USER, SCALE_MODE, "manual")
+        self.app.preferences.set(GLOBAL_USER, SCALE_PERCENT, 120)
+        self.user = self.services.auth.login("anna", "password1")
+        patcher = mock.patch.object(runtime, "restart_program")
+        self.restart = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(setattr, scaling, "_manual_active", False)
+
+    def test_sign_in_restarts_into_the_manual_scale(self):
+        self.app.sign_in(self.user, "password1")
+        self.restart.assert_called_once()
+        self.assertIsNone(self.app.user)
+        self.assertEqual(self.app.handoff.user_id(), self.user.id)
+
+    def test_handoff_signs_in_without_a_password_after_the_restart(self):
+        self.app.handoff.remember(self.user.id, self.user.password_hash)
+        scaling._manual_active = True
+        self.assertTrue(self.app.restore_session())
+        self.assertEqual(self.app.user.id, self.user.id)
+        self.assertIsNone(self.app.handoff.user_id())
+        self.restart.assert_not_called()
+
+    def test_sign_in_with_the_manual_scale_already_on_does_not_restart(self):
+        scaling._manual_active = True
+        self.app.sign_in(self.user, "password1")
+        self.restart.assert_not_called()
+        self.assertIsNotNone(self.app.user)
+
+    def test_sign_out_restarts_to_the_login_in_auto_scale(self):
+        scaling._manual_active = True
+        self.app.sign_in(self.user, "password1")
+        self.app.sign_out()
+        self.restart.assert_called_once()
+
+    def test_auto_scale_never_restarts(self):
+        self.app.preferences.set(GLOBAL_USER, SCALE_MODE, "auto")
+        self.app.sign_in(self.user, "password1")
+        self.app.sign_out()
+        self.restart.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """Окно приложения: переключение экранов и вход пользователя."""
 
+from datetime import timedelta
 from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer
@@ -26,11 +27,14 @@ from pharmacy.ui.preferences import (
     Preferences,
 )
 from pharmacy.ui.remember import REMEMBER_FILE, RememberedLogin
+from pharmacy.ui import scaling
 
 WINDOW_TITLE = "Моя аптечка"
 SYSTEM_THEME = "system"
 SYSTEM_THEME_CHECK_MS = 2000
 PREFERENCES_FILE = "preferences.json"  # лежит рядом с файлом базы
+HANDOFF_FILE = "handoff.json"  # вход при перезапуске ради масштаба
+HANDOFF_LIFETIME = timedelta(minutes=2)
 ScreenFactory = Callable[["App"], QWidget]
 
 
@@ -49,6 +53,7 @@ class App(QMainWindow):
         services: Services,
         preferences: Optional[Preferences] = None,
         remembered: Optional[RememberedLogin] = None,
+        handoff: Optional[RememberedLogin] = None,
     ) -> None:
         """Создаёт окно по размеру макета и показывает экран входа.
 
@@ -62,6 +67,8 @@ class App(QMainWindow):
         self.services = services
         self.preferences = preferences or Preferences()
         self.remembered = remembered or RememberedLogin()
+        # Вход «на минуту»: нужен, чтобы войти после перезапуска ради масштаба.
+        self.handoff = handoff or RememberedLogin(lifetime=HANDOFF_LIFETIME)
         self.reopen_settings: Optional[str] = None  # раздел настроек после пересборки
         self.search_modal: Optional[SearchModal] = None
         services.notifications.options_for = self.notify_options
@@ -135,6 +142,13 @@ class App(QMainWindow):
         """
         if remember:
             self.remembered.remember(user.id, user.password_hash)
+        wanted = manual_scale(self.preferences)
+        if wanted and not scaling.manual_scale_active():
+            # Экран входа идёт в автомасштабе, а у устройства выбран ручной:
+            # масштаб меняется только при запуске, поэтому перезапускаемся.
+            self.handoff.remember(user.id, user.password_hash)
+            runtime.restart_program()
+            return
         self.user = user
         self.session_password = password
         self._apply_view_settings(user)
@@ -147,18 +161,21 @@ class App(QMainWindow):
         Returns:
             True, если вход выполнен.
         """
-        user_id = self.remembered.user_id()
-        if user_id is None:
-            return False
-        try:
-            user = self.services.settings.get_user(user_id)
-        except NotFoundError:
-            user = None
-        if user is None or not self.remembered.matches(user.password_hash):
-            self.remembered.clear()
-            return False
-        self.sign_in(user)
-        return True
+        for source in (self.handoff, self.remembered):
+            user_id = source.user_id()
+            if user_id is None:
+                continue
+            try:
+                user = self.services.settings.get_user(user_id)
+            except NotFoundError:
+                user = None
+            if user is None or not source.matches(user.password_hash):
+                source.clear()
+                continue
+            self.handoff.clear()
+            self.sign_in(user)
+            return True
+        return False
 
     def apply_user_changes(
         self, user: User, notice: str = "", start: str = sections.SETTINGS
@@ -267,6 +284,9 @@ class App(QMainWindow):
         theme.set_theme(runtime.system_theme())
         theme.set_text_size(theme.DEFAULT_TEXT_SIZE)
         self.setMinimumSize(theme.WINDOW_MIN_WIDTH, theme.WINDOW_MIN_HEIGHT)
+        if scaling.manual_scale_active():
+            runtime.restart_program()  # вход и регистрация идут в автомасштабе
+            return
         self.show_login()
 
     def _center(self) -> None:
@@ -305,13 +325,17 @@ def run(db: Optional[Database] = None) -> None:
     """
     db = db or Database()
     preferences = Preferences(db.path.parent / PREFERENCES_FILE)
-    apply_scale_factor(manual_scale(preferences))
+    remembered = RememberedLogin(db.path.parent / REMEMBER_FILE)
+    handoff = RememberedLogin(db.path.parent / HANDOFF_FILE, HANDOFF_LIFETIME)
+    # Ручной масштаб действует, пока пользователь вошёл: вход и регистрация
+    # всегда идут в масштабе, подобранном по экрану.
+    signed_in = remembered.user_id() is not None or handoff.user_id() is not None
+    apply_scale_factor(manual_scale(preferences) if signed_in else None)
     application = runtime.application()
     db.init_schema()
     if is_demo_build():
         prepare_demo(db)
-    remembered = RememberedLogin(db.path.parent / REMEMBER_FILE)
-    window = App(build_services(db), preferences, remembered)
+    window = App(build_services(db), preferences, remembered, handoff)
     window.restore_session()
     window.watch_system_theme()
     window.show()
