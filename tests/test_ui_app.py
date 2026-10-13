@@ -514,20 +514,26 @@ class NavigationTest(AppTestCase):
         self.assertFalse(self.app.isVisible())
 
 
-class ManualScaleLoginTest(AppTestCase):
-    """Вход и регистрация всегда в автомасштабе, ручной действует после входа."""
+class ScaleLoginTest(AppTestCase):
+    """Вход и регистрация в своём масштабе, масштаб пользователя после входа."""
 
     def setUp(self) -> None:
         super().setUp()
         self.app.preferences.set(GLOBAL_USER, SCALE_MODE, "manual")
         self.app.preferences.set(GLOBAL_USER, SCALE_PERCENT, 120)
         self.user = self.services.auth.login("anna", "password1")
+        for name, value in (("_applied", True), ("_scale_factor", 1.0)):
+            self.addCleanup(setattr, scaling, name, getattr(scaling, name))
+            setattr(scaling, name, value)
+        for name, value in (("login_scale", 1.0), ("auto_scale", 1.0)):
+            patcher = mock.patch.object(scaling, name, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         patcher = mock.patch.object(runtime, "restart_program")
         self.restart = patcher.start()
         self.addCleanup(patcher.stop)
-        self.addCleanup(setattr, scaling, "_manual_active", False)
 
-    def test_sign_in_restarts_into_the_manual_scale(self):
+    def test_sign_in_restarts_into_the_user_scale(self):
         self.app.sign_in(self.user, "password1")
         self.restart.assert_called_once()
         self.assertIsNone(self.app.user)
@@ -535,29 +541,42 @@ class ManualScaleLoginTest(AppTestCase):
 
     def test_handoff_signs_in_without_a_password_after_the_restart(self):
         self.app.handoff.remember(self.user.id, self.user.password_hash)
-        scaling._manual_active = True
+        scaling._scale_factor = 1.2
         self.assertTrue(self.app.restore_session())
         self.assertEqual(self.app.user.id, self.user.id)
         self.assertIsNone(self.app.handoff.user_id())
         self.restart.assert_not_called()
 
-    def test_sign_in_with_the_manual_scale_already_on_does_not_restart(self):
-        scaling._manual_active = True
+    def test_sign_in_with_the_scale_already_on_does_not_restart(self):
+        scaling._scale_factor = 1.2
         self.app.sign_in(self.user, "password1")
         self.restart.assert_not_called()
         self.assertIsNotNone(self.app.user)
 
-    def test_sign_out_restarts_to_the_login_in_auto_scale(self):
-        scaling._manual_active = True
+    def test_sign_out_restarts_to_the_login_scale(self):
+        scaling._scale_factor = 1.2
         self.app.sign_in(self.user, "password1")
         self.app.sign_out()
         self.restart.assert_called_once()
 
-    def test_auto_scale_never_restarts(self):
+    def test_same_scale_never_restarts(self):
         self.app.preferences.set(GLOBAL_USER, SCALE_MODE, "auto")
         self.app.sign_in(self.user, "password1")
         self.app.sign_out()
         self.restart.assert_not_called()
+
+
+class LoginScaleTest(unittest.TestCase):
+    def test_login_is_never_smaller_than_normal(self):
+        with mock.patch.object(scaling, "auto_scale", return_value=0.8):
+            self.assertEqual(scaling.login_scale(), 1.0)
+        with mock.patch.object(scaling, "auto_scale", return_value=1.3):
+            self.assertEqual(scaling.login_scale(), 1.3)
+
+    def test_session_scale_is_manual_or_auto(self):
+        with mock.patch.object(scaling, "auto_scale", return_value=0.8):
+            self.assertEqual(scaling.session_scale(None), 0.8)
+            self.assertEqual(scaling.session_scale(1.2), 1.2)
 
 
 if __name__ == "__main__":

@@ -151,7 +151,7 @@ class ManualScaleTest(unittest.TestCase):
             os.environ.pop(scaling.ENV_NAME)
             self.assertEqual(scaling.apply_scale_factor(0.1), scaling.MIN_MANUAL)
         finally:
-            scaling.apply_scale_factor.__globals__["_manual_active"] = False
+            scaling._applied = False
             os.environ.pop(scaling.ENV_NAME, None)
             if saved is not None:
                 os.environ[scaling.ENV_NAME] = saved

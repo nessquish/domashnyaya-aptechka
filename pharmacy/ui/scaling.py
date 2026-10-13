@@ -22,7 +22,9 @@ MIN_MANUAL = 0.8  # границы ручного масштаба в настр
 MAX_MANUAL = 1.5
 
 _scale_factor = 1.0
-_manual_active = False  # применён масштаб пользователя, а не авто
+_applied = False  # масштаб выбрала программа (а не QT_SCALE_FACTOR)
+_auto = None
+LOGIN_SCALE = 1.0  # вход и регистрация не мельче этого
 
 
 def compute_scale_factor(width: int, height: int) -> float:
@@ -56,8 +58,11 @@ def _screen_size() -> Optional[Tuple[int, int]]:
     """
     if getattr(sys, "frozen", False):
         return _windows_screen_size()
+    # Наш QT_SCALE_FACTOR не должен попасть в измерение: оно нужно «чистое».
+    clean_env = {k: v for k, v in os.environ.items() if k != ENV_NAME}
     result = subprocess.run(
         [sys.executable, "-c", _PROBE],
+        env=clean_env,
         capture_output=True,
         text=True,
         timeout=10,
@@ -83,22 +88,50 @@ def _windows_screen_size() -> Optional[Tuple[int, int]]:
     return round(width / ratio), round(height / ratio)
 
 
-def apply_scale_factor(manual: Optional[float] = None) -> float:
+def auto_scale() -> float:
+    """Масштаб, подобранный по экрану (1.0, если экран определить не удалось)."""
+    global _auto
+    if _auto is None:
+        try:
+            size = _screen_size()
+        except Exception:
+            size = None
+        _auto = compute_scale_factor(*size) if size is not None else 1.0
+    return _auto
+
+
+def login_scale() -> float:
+    """Масштаб входа и регистрации: по экрану, но не меньше обычного размера."""
+    return max(auto_scale(), LOGIN_SCALE)
+
+
+def session_scale(manual: Optional[float] = None) -> float:
+    """Масштаб после входа: ручной из настроек или подобранный по экрану."""
+    return clamp_manual(manual) if manual else auto_scale()
+
+
+def clamp_manual(value: float) -> float:
+    """Ручной масштаб в допустимых границах."""
+    return round(max(MIN_MANUAL, min(value, MAX_MANUAL)), 2)
+
+
+def apply_scale_factor(manual: Optional[float] = None, login: bool = False) -> float:
     """Определяет коэффициент и включает его до создания окна.
 
-    По умолчанию масштаб подбирается сам. Если в настройках выбран ручной
-    масштаб, берётся он. Если задана переменная ``QT_SCALE_FACTOR``, берётся её
-    значение. При ошибке определения экрана масштаб остаётся 1.0.
-    Вызывать нужно до создания ``QApplication``.
+    На входе и регистрации (``login``) масштаб по экрану, но не меньше обычного.
+    После входа берётся ручной масштаб из настроек, а если его нет, подобранный
+    по экрану. Если задана переменная ``QT_SCALE_FACTOR``, берётся её значение.
+    При ошибке определения экрана масштаб остаётся 1.0. Вызывать нужно до
+    создания ``QApplication``.
 
     Args:
         manual: Коэффициент, выбранный пользователем (например, 1.25).
+        login: Масштаб экранов входа и регистрации.
 
     Returns:
         Применённый коэффициент масштабирования.
     """
-    global _scale_factor, _manual_active
-    _manual_active = False
+    global _scale_factor, _applied
     forced = os.environ.get(ENV_NAME)
     if forced:
         try:
@@ -106,24 +139,19 @@ def apply_scale_factor(manual: Optional[float] = None) -> float:
         except ValueError:
             _scale_factor = 1.0
         return _scale_factor
-    if manual:
-        _manual_active = True
-        _scale_factor = round(max(MIN_MANUAL, min(manual, MAX_MANUAL)), 2)
-        os.environ[ENV_NAME] = str(_scale_factor)
-        return _scale_factor
-    try:
-        size = _screen_size()
-    except Exception:
-        size = None
-    if size is not None:
-        _scale_factor = compute_scale_factor(*size)
-        os.environ[ENV_NAME] = str(_scale_factor)
+    _applied = True
+    _scale_factor = login_scale() if login else session_scale(manual)
+    os.environ[ENV_NAME] = str(_scale_factor)
     return _scale_factor
 
 
-def manual_scale_active() -> bool:
-    """Идёт ли программа с ручным масштабом (а не с подобранным по экрану)."""
-    return _manual_active
+def differs_from(target: float) -> bool:
+    """Нужен ли перезапуск, чтобы масштаб стал ``target``.
+
+    Если масштаб не выбирала сама программа (его задал ``QT_SCALE_FACTOR``
+    или это тест), перезапуск не нужен.
+    """
+    return _applied and abs(_scale_factor - target) > 0.001
 
 
 def scale_factor() -> float:

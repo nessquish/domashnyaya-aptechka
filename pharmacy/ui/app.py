@@ -142,10 +142,9 @@ class App(QMainWindow):
         """
         if remember:
             self.remembered.remember(user.id, user.password_hash)
-        wanted = manual_scale(self.preferences)
-        if wanted and not scaling.manual_scale_active():
-            # Экран входа идёт в автомасштабе, а у устройства выбран ручной:
-            # масштаб меняется только при запуске, поэтому перезапускаемся.
+        if scaling.differs_from(scaling.session_scale(manual_scale(self.preferences))):
+            # Вход шёл в своём масштабе, а у пользователя другой (ручной или
+            # крупнее): масштаб меняется только при запуске, перезапускаемся.
             self.handoff.remember(user.id, user.password_hash)
             runtime.restart_program()
             return
@@ -284,8 +283,8 @@ class App(QMainWindow):
         theme.set_theme(runtime.system_theme())
         theme.set_text_size(theme.DEFAULT_TEXT_SIZE)
         self.setMinimumSize(theme.WINDOW_MIN_WIDTH, theme.WINDOW_MIN_HEIGHT)
-        if scaling.manual_scale_active():
-            runtime.restart_program()  # вход и регистрация идут в автомасштабе
+        if scaling.differs_from(scaling.login_scale()):
+            runtime.restart_program()  # вход и регистрация идут в своём масштабе
             return
         self.show_login()
 
@@ -327,10 +326,10 @@ def run(db: Optional[Database] = None) -> None:
     preferences = Preferences(db.path.parent / PREFERENCES_FILE)
     remembered = RememberedLogin(db.path.parent / REMEMBER_FILE)
     handoff = RememberedLogin(db.path.parent / HANDOFF_FILE, HANDOFF_LIFETIME)
-    # Ручной масштаб действует, пока пользователь вошёл: вход и регистрация
-    # всегда идут в масштабе, подобранном по экрану.
+    # Масштаб пользователя действует, пока он вошёл: вход и регистрация всегда
+    # идут в своём масштабе и не зависят от настроек.
     signed_in = remembered.user_id() is not None or handoff.user_id() is not None
-    apply_scale_factor(manual_scale(preferences) if signed_in else None)
+    apply_scale_factor(manual_scale(preferences), login=not signed_in)
     application = runtime.application()
     db.init_schema()
     if is_demo_build():
