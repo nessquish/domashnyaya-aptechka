@@ -173,7 +173,8 @@ class TemplateTest(DataTestCase):
         self.assertEqual(book.sheetnames, ["Шаблон", "Подсказки"])
         sheet = book["Шаблон"]
         self.assertEqual(sheet["A2"].value, "Название")
-        self.assertEqual(sheet["J2"].value, "Товар")
+        self.assertEqual(sheet["I2"].value, "Товар")
+        self.assertNotIn("Дата добавления", [c.value for c in sheet[2]])
         hints = [row[3].value for row in book["Подсказки"].iter_rows()]
         self.assertEqual(
             {c.name for c in self.services.products.list_categories()},
@@ -189,14 +190,14 @@ class TemplateTest(DataTestCase):
         book = load_workbook(path)
         sheet = book["Шаблон"]
         rows = (
-            ("Йод", None, "Лекарства", 2, "фл.", datetime(2030, 5, 17), "Шкаф"),
-            ("Вата", None, "Нет такой", 1, "шт.", None, None),
+            ("Йод", "Лекарства", 2, "фл.", datetime(2030, 5, 17), "Шкаф"),
+            ("Вата", "Нет такой", 1, "шт.", None, None),
         )
         for row, values in enumerate(rows, start=3):
             for column, value in enumerate(values, start=1):
                 sheet.cell(row, column, value)
-        sheet["J3"], sheet["L3"] = "Пластыри", 3
-        sheet["J4"] = "Бинт"
+        sheet["I3"], sheet["J3"] = "Пластыри", 3
+        sheet["I4"] = "Бинт"
         book.save(path)
         other = self.add_user("boris")
         result = self.services.data.import_products(other, path)
