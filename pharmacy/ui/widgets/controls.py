@@ -13,6 +13,7 @@ from pharmacy.ui import theme
 from pharmacy.ui.theme import palette
 
 Callback = Callable[[int], None]
+MAX_BUTTONS = 5  # сколько номеров страниц показано сразу
 
 
 class Segmented(QWidget):
@@ -359,8 +360,18 @@ class Pagination(QWidget):
         """Номер текущей страницы."""
         return self._page
 
+    def visible_pages(self) -> range:
+        """Номера страниц на кнопках: не больше пяти, текущая стоит в середине.
+
+        Страницы 1-4 из 8 дают 1-5, страница 4 даёт 2-6, страница 8 даёт 4-8.
+        """
+        first = min(
+            max(self._page - MAX_BUTTONS // 2, 1), max(self._pages - MAX_BUTTONS + 1, 1)
+        )
+        return range(first, min(first + MAX_BUTTONS, self._pages + 1))
+
     def _cells(self) -> List[Tuple[str, int]]:
-        numbers = [("page", n) for n in range(1, self._pages + 1)]
+        numbers = [("page", n) for n in self.visible_pages()]
         return [("prev", self._page - 1)] + numbers + [("next", self._page + 1)]
 
     def cell_left(self, index: int) -> int:
