@@ -91,7 +91,7 @@ class ImportTest(DataTestCase):
         )
         result = self.services.data.import_products(self.user_id, path)
         self.assertEqual((result.added, result.skipped), (1, 2))
-        self.assertTrue(result.errors[0].startswith("Строка 2"))
+        self.assertTrue(result.errors[0].startswith("Моя аптечка, строка 2"))
 
     def test_other_extensions_and_broken_files_are_rejected(self):
         for name, text in (("a.txt", "x"), ("a.json", "[]")):
@@ -156,6 +156,32 @@ class ManualScaleTest(unittest.TestCase):
                 os.environ[scaling.ENV_NAME] = saved
 
 
+class ReportTest(unittest.TestCase):
+    def test_report_lists_counts_and_every_reason_grouped(self):
+        from pharmacy.services.data_service import ImportResult
+
+        result = ImportResult(added=3, shopping_added=67)
+        result.issues = [
+            ("Моя аптечка", 3, "Слишком большое значение"),
+            ("Моя аптечка", 5, "Слишком большое значение"),
+            ("Список покупок", 4, "Введите название"),
+        ]
+        self.assertEqual(
+            result.report().split("\n"),
+            [
+                "Добавлено товаров в аптечку: 3",
+                "Добавлено товаров в список покупок: 67",
+                "Ошибка импорта: Слишком большое значение (Моя аптечка, строки 3, 5)",
+                "Ошибка импорта: Введите название (Список покупок, строка 4)",
+            ],
+        )
+
+    def test_report_without_problems_has_no_error_lines(self):
+        from pharmacy.services.data_service import ImportResult
+
+        self.assertNotIn("Ошибка", ImportResult(added=1).report())
+
+
 class TemplateTest(DataTestCase):
     def test_csv_template_imports_back(self):
         path = self.folder / "t.csv"
@@ -206,7 +232,7 @@ class TemplateTest(DataTestCase):
         result = self.services.data.import_products(other, path)
         self.assertEqual((result.added, result.shopping_added), (1, 2))
         self.assertEqual(len(result.errors), 1)
-        self.assertTrue(result.errors[0].startswith("Строка 4"))
+        self.assertTrue(result.errors[0].startswith("Моя аптечка, строка 4"))
         product = self.products(other)[0].product
         self.assertEqual(product.expiry_date.isoformat(), "2030-05-17")
         items = self.services.shopping.list_items(other)

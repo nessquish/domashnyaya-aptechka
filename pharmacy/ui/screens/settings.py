@@ -579,12 +579,7 @@ class SettingsScreen(QWidget):
             self._info("Не удалось загрузить", error.message)
             return
         self._shell.refresh_counters()
-        text = f"Добавлено товаров: {result.added}."
-        if result.shopping_added:
-            text += f" В список покупок: {result.shopping_added}."
-        if result.errors:
-            text += f" Пропущено: {result.skipped}.\n" + "\n".join(result.errors[:5])
-        self._info("Импорт завершён", text)
+        self._info("Импорт завершён", result.report())
 
     def _confirm_clear_history(self) -> None:
         Dialog(

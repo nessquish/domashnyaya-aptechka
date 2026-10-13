@@ -95,19 +95,46 @@ class ImportResult:
     """Итог импорта.
 
     Attributes:
-        added: Сколько товаров добавлено.
+        added: Сколько товаров добавлено в аптечку.
         shopping_added: Сколько позиций добавлено в список покупок.
-        errors: Сообщения о пропущенных строках («Строка 3: ...»).
+        issues: Пропущенные строки: (лист, номер строки, причина).
     """
 
     added: int = 0
     shopping_added: int = 0
-    errors: List[str] = field(default_factory=list)
+    issues: List[Tuple[str, int, str]] = field(default_factory=list)
+
+    @property
+    def errors(self) -> List[str]:
+        """Пропущенные строки текстом («Моя аптечка, строка 3: причина»)."""
+        return [f"{sheet}, строка {row}: {why}" for sheet, row, why in self.issues]
 
     @property
     def skipped(self) -> int:
         """Сколько строк пропущено."""
-        return len(self.errors)
+        return len(self.issues)
+
+    def report(self) -> str:
+        """Итог для показа: сколько добавлено и все причины пропуска.
+
+        Одинаковые причины собраны вместе: «Ошибка импорта: причина (лист,
+        строки 3, 5)».
+        """
+        lines = [
+            f"Добавлено товаров в аптечку: {self.added}",
+            f"Добавлено товаров в список покупок: {self.shopping_added}",
+        ]
+        reasons: Dict[str, Dict[str, List[int]]] = {}
+        for sheet, row, why in self.issues:
+            reasons.setdefault(why, {}).setdefault(sheet, []).append(row)
+        for why, sheets in reasons.items():
+            places = "; ".join(
+                f"{sheet}, {'строка' if len(rows) == 1 else 'строки'} "
+                + ", ".join(map(str, rows))
+                for sheet, rows in sheets.items()
+            )
+            lines.append(f"Ошибка импорта: {why} ({places})")
+        return "\n".join(lines)
 
 
 class DataService:
@@ -268,14 +295,14 @@ class DataService:
                 result.added += 1
             except ValidationError as error:
                 row = record.get("_row", number)
-                result.errors.append(f"Строка {row}: {error.message}")
+                result.issues.append((KIT_SHEET, row, error.message))
         for number, record in enumerate(wanted, start=1):
             try:
                 self._add_wanted(user_id, record)
                 result.shopping_added += 1
             except ValidationError as error:
                 row = record.get("_row", number)
-                result.errors.append(f"Список покупок, строка {row}: {error.message}")
+                result.issues.append((SHOPPING_SHEET, row, error.message))
         return result
 
     def _add_wanted(self, user_id: int, record: Dict[str, object]) -> None:
