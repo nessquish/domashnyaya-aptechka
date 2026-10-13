@@ -172,4 +172,3 @@ python -m unittest
 
 Используется Feature Branch Workflow: каждая задача разрабатывается в ветке
 `feature/...` и вливается в `main` через Pull Request после ревью.
-Ход разработки записан в [DEVLOG.md](DEVLOG.md).
