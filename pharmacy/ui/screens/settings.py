@@ -497,7 +497,7 @@ class SettingsScreen(QWidget):
             row.addWidget(Button(title, self._import, size="sm"))
             row.addSpacing(4)
         row, _ = self._row(
-            "Шаблон для импорта", "Файл для заполнения: столбцы, примеры и подсказки"
+            "Шаблон для импорта", "Файл для заполнения: аптечка и список покупок"
         )
         self.template_buttons = {}
         for fmt, title in FILE_FORMATS:
@@ -580,6 +580,8 @@ class SettingsScreen(QWidget):
             return
         self._shell.refresh_counters()
         text = f"Добавлено товаров: {result.added}."
+        if result.shopping_added:
+            text += f" В список покупок: {result.shopping_added}."
         if result.errors:
             text += f" Пропущено: {result.skipped}.\n" + "\n".join(result.errors[:5])
         self._info("Импорт завершён", text)
