@@ -23,6 +23,7 @@ from pharmacy.ui.widgets.common import (
     label,
 )
 from pharmacy.ui.widgets.controls import Segmented
+from pharmacy.ui.widgets.dialog import Dialog
 from pharmacy.ui.widgets.highlight import Highlight
 from pharmacy.ui.widgets.iconbox import IconBox
 from pharmacy.ui.widgets.page import PageHeader
@@ -104,6 +105,11 @@ class NotificationsScreen(ScrollListScreen):
         header.actions.addSpacing(8 - 2 * SHADOW_PAD)
         self.read_all_button = Button("Прочитать все", command=self._read_all)
         header.actions.addWidget(self.read_all_button)
+        header.actions.addSpacing(8 - 2 * SHADOW_PAD)
+        self.clear_button = Button(
+            "Очистить уведомления", self._confirm_clear, variant="danger"
+        )
+        header.actions.addWidget(self.clear_button)
         self._layout.addWidget(header)
         self._layout.addLayout(self._build_tabs())
         self._add_list_card()
@@ -182,6 +188,9 @@ class NotificationsScreen(ScrollListScreen):
         self.setUpdatesEnabled(False)
         try:
             self._tabs.set_items(self._tab_labels())
+            self.clear_button.setEnabled(
+                bool(self._services.notifications.list_notifications(self._user.id))
+            )
             clear_layout(self._list)
             self._rows = {}
             items = self._visible()
@@ -308,6 +317,22 @@ class NotificationsScreen(ScrollListScreen):
 
     def _read_all(self) -> None:
         self._services.notifications.mark_all_read(self._user.id)
+        self._reload()
+
+    def _confirm_clear(self) -> None:
+        Dialog(
+            self._shell.app,
+            "Очистить уведомления?",
+            "Все уведомления будут удалены. Если причина останется (срок истёк, "
+            "мало товара), уведомление появится снова при следующем входе.",
+            "Очистить",
+            self._clear,
+            confirm_variant="danger_solid",
+            warning=True,
+        )
+
+    def _clear(self) -> None:
+        self._services.notifications.delete_all(self._user.id)
         self._reload()
 
     def _mark_read(self, item: Notification) -> None:

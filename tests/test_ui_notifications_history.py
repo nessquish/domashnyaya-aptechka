@@ -119,6 +119,18 @@ class NotificationsTest(ShellTestCase):
             "Уведомлений нет", [w.text() for w in find_all(self.page, QLabel)]
         )
 
+    def test_clear_asks_first_then_removes_everything(self):
+        self.page.clear_button.invoke()
+        self.settle()
+        self.assertTrue(self.notifications())
+        self.buttons("Очистить")[0].invoke()
+        self.settle()
+        self.assertEqual(self.notifications(), [])
+        self.assertFalse(self.page.clear_button.enabled)
+        self.assertIn(
+            "Уведомлений нет", [w.text() for w in find_all(self.page, QLabel)]
+        )
+
     def test_unread_tab_hides_read_items(self):
         first = self.notifications()[0]
         self.services.notifications.mark_read(self.app.user.id, first.id)
