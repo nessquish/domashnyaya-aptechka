@@ -17,5 +17,6 @@ data/
 build/
 dist/
 
-# Выгрузка экранов для Figma (создаётся tools/figma_export.py)
-design_export/
+# Отчёт покрытия тестов (coverage run -m unittest)
+.coverage
+htmlcov/

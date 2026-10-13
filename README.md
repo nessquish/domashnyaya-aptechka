@@ -547,7 +547,14 @@ pre-commit install          # проверки black и flake8 при каждо
 .venv\Scripts\python.exe -m unittest
 ```
 
-Тесты идут на невидимой платформе Qt (`offscreen`), около двух минут. Один модуль:
+Покрытие кода тестами (coverage.py):
+
+```powershell
+.venv\Scripts\python.exe -m coverage run --source=pharmacy -m unittest
+.venv\Scripts\python.exe -m coverage report
+```
+
+Сейчас покрытие около 94 %. Тесты идут на невидимой платформе Qt (`offscreen`), около двух минут. Один модуль:
 `python -m unittest tests.test_data_service`.
 
 ### Структура проекта
