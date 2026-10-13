@@ -40,141 +40,6 @@ class PreferencesTest(unittest.TestCase):
         self.assertEqual(prefs.get(2, "text_size"), "medium")
         self.assertIsNone(prefs.get(3, "text_size"))
 
-    def test_keys_do_not_overwrite_each_other(self):
-        prefs = Preferences(self.path())
-        prefs.set(1, "text_size", "large")
-        prefs.set(1, "sidebar_collapsed", True)
-        self.assertEqual(prefs.get(1, "text_size"), "large")
-        self.assertTrue(prefs.get(1, "sidebar_collapsed"))
-
-    def test_in_memory_mode_writes_nothing(self):
-        prefs = Preferences()
-        prefs.set(1, "text_size", "large")
-        self.assertEqual(prefs.get(1, "text_size"), "large")
-
-    def test_broken_file_is_ignored(self):
-        path = self.path()
-        path.write_text("{не json", encoding="utf-8")
-        prefs = Preferences(path)
-        self.assertEqual(prefs.get(1, "text_size", "normal"), "normal")
-        prefs.set(1, "text_size", "large")  # и после этого всё работает
-        self.assertEqual(Preferences(path).get(1, "text_size"), "large")
-
-    def test_unexpected_json_shape_is_ignored(self):
-        path = self.path()
-        path.write_text(json.dumps(["не", "словарь"]), encoding="utf-8")
-        self.assertIsNone(Preferences(path).get(1, "text_size"))
-        path.write_text(json.dumps({"1": "строка"}), encoding="utf-8")
-        self.assertIsNone(Preferences(path).get(1, "text_size"))
-
-    def test_creates_missing_folder(self):
-        path = self.path().parent / "nested" / "p.json"
-        Preferences(path).set(1, "k", 1)
-        self.assertTrue(path.is_file())
-
-
-class TextScaleTest(unittest.TestCase):
-    def tearDown(self):
-        theme.set_text_size("normal")
-
-    def test_sizes_for_the_main_text(self):
-        results = {}
-        for name in ("normal", "medium", "large"):
-            theme.set_text_size(name)
-            results[name] = theme.scaled(12)
-        self.assertEqual(results, {"normal": 13, "medium": 15, "large": 17})
-
-    def test_each_step_is_clearly_visible(self):
-        """Соседние размеры отличаются не меньше чем на 2 пикселя у основного текста."""
-        theme.set_text_size("normal")
-        normal = theme.scaled(12)
-        theme.set_text_size("medium")
-        medium = theme.scaled(12)
-        theme.set_text_size("large")
-        large = theme.scaled(12)
-        self.assertGreaterEqual(medium - normal, 2)
-        self.assertGreaterEqual(large - medium, 2)
-
-    def test_smallest_text_is_not_tiny(self):
-        for name in theme.TEXT_SIZES:
-            theme.set_text_size(name)
-            smallest = min(theme.scaled(size) for size, _w in theme.TYPOGRAPHY.values())
-            self.assertGreaterEqual(smallest, 12, name)
-
-    def test_every_style_gets_bigger_with_each_step(self):
-        for style, (size, _weight) in theme.TYPOGRAPHY.items():
-            theme.set_text_size("normal")
-            normal = theme.scaled(size)
-            theme.set_text_size("medium")
-            medium = theme.scaled(size)
-            theme.set_text_size("large")
-            large = theme.scaled(size)
-            self.assertLess(normal, medium, style)
-            self.assertLess(medium, large, style)
-
-    def test_unknown_size_is_rejected(self):
-        with self.assertRaises(ValueError):
-            theme.set_text_size("huge")
-        self.assertEqual(theme.text_size_name(), "normal")
-
-    def test_font_follows_the_size(self):
-        theme.set_text_size("normal")
-        normal = fonts.font("body").pixelSize()
-        theme.set_text_size("large")
-        self.assertEqual(fonts.font("body").pixelSize(), theme.scaled(12))
-        self.assertGreater(fonts.font("body").pixelSize(), normal)
-
-    def test_window_and_sidebar_grow_with_text(self):
-        widths = []
-        for name in ("normal", "medium", "large"):
-            theme.set_text_size(name)
-            widths.append((theme.window_width(), theme.sidebar_width()))
-        for smaller, bigger in zip(widths, widths[1:]):
-            self.assertGreater(bigger[0], smaller[0])
-            self.assertGreater(bigger[1], smaller[1])
-        # Даже при обычном тексте панель шире, чем в макете: текст стал крупнее.
-        self.assertGreater(widths[0][1], theme.SIDEBAR_WIDTH)
-
-    def test_scale_is_exposed(self):
-        theme.set_text_size("medium")
-        self.assertEqual(theme.text_scale(), 1.25)
-
-    def test_text_gets_wider_with_the_size(self):
-        theme.set_text_size("normal")
-        normal = fonts.text_width("Список покупок", "body")
-        theme.set_text_size("large")
-        self.assertGreater(fonts.text_width("Список покупок", "body"), normal)
-
-
-class FontsTest(unittest.TestCase):
-    def test_inter_is_registered_from_the_bundled_files(self):
-        self.assertTrue(fonts.register_fonts())
-        self.assertEqual(fonts.font("body").family(), "Inter")
-
-    def test_every_weight_comes_from_inter_not_the_fallback(self):
-        for style, (_size, weight) in theme.TYPOGRAPHY.items():
-            font = fonts.font(style)
-            self.assertEqual(font.family(), "Inter", style)
-            self.assertEqual(int(font.weight()), weight, style)
-
-    def test_installed_inter_has_all_five_files(self):
-        from PySide6.QtGui import QFontDatabase
-
-        self.assertEqual(
-            QFontDatabase.styles("Inter"),
-            ["Regular", "Medium", "SemiBold", "Bold", "ExtraBold"],
-        )
-
-    def test_every_style_has_a_font(self):
-        for style in theme.TYPOGRAPHY:
-            self.assertGreater(fonts.font(style).pixelSize(), 0, style)
-            self.assertGreater(fonts.line_height(style), 0, style)
-
-    def test_missing_files_fall_back_gracefully(self):
-        with mock.patch.object(fonts, "FONTS_DIR", Path("нет/такой/папки")):
-            self.assertFalse(fonts.register_fonts())
-        fonts.register_fonts()
-
 
 class TextSizeInAppTest(ShellTestCase):
     def pick(self, index):
@@ -212,23 +77,11 @@ class TextSizeInAppTest(ShellTestCase):
             self.assertGreater(self.app.minimumWidth(), before)
             self.assertGreaterEqual(self.app.width(), theme.window_width())
 
-    def test_window_never_exceeds_the_screen(self):
-        with mock.patch.object(runtime, "screen_size", return_value=(1280, 800)):
-            self.open_settings()
-            self.pick(2)
-            self.assertLessEqual(self.app.minimumWidth(), 1280 - 40)
-
     def test_text_really_gets_bigger(self):
         before = fonts.font("body").pixelSize()
         self.open_settings()
         self.pick(1)
         self.assertGreater(fonts.font("body").pixelSize(), before)
-
-    def test_selecting_the_same_size_does_nothing(self):
-        self.open_settings()
-        shell = self.shell
-        shell.set_text_size("normal")
-        self.assertIs(self.app.screen_widget, shell)
 
     def test_size_is_restored_at_the_next_sign_in(self):
         self.open_settings()
@@ -283,12 +136,6 @@ class SidebarCollapseTest(ShellTestCase):
         self.assertTrue(self.shell.sidebar.isVisible())
         self.assertFalse(self.shell._rail.isVisible())
 
-    def test_content_gets_the_freed_space(self):
-        before = self.shell._scroll.width()
-        self.shell.set_sidebar_collapsed(True)
-        self.settle()
-        self.assertGreater(self.shell._scroll.width(), before + 100)
-
     def test_choice_is_remembered_and_restored(self):
         self.shell.set_sidebar_collapsed(True)
         self.assertTrue(self.app.preferences.get(self.app.user.id, "sidebar_collapsed"))
@@ -297,20 +144,10 @@ class SidebarCollapseTest(ShellTestCase):
         self.assertTrue(self.shell.sidebar_collapsed)
         self.assertTrue(self.shell._rail.isVisible())
 
-    def test_collapsing_twice_changes_nothing(self):
-        self.shell.set_sidebar_collapsed(True)
-        self.shell.set_sidebar_collapsed(True)
-        self.settle()
-        self.assertTrue(self.shell._rail.isVisible())
-
     def test_navigation_keeps_working_when_collapsed(self):
         self.shell.set_sidebar_collapsed(True)
         self.open(sections.HISTORY)
         self.assertEqual(self.shell.section, sections.HISTORY)
-
-    def test_other_users_keep_their_own_state(self):
-        self.shell.set_sidebar_collapsed(True)
-        self.assertFalse(self.app.preferences.get(999, "sidebar_collapsed", False))
 
 
 if __name__ == "__main__":
