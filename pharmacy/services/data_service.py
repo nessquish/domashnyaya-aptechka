@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from pharmacy.db.connection import Database
 from pharmacy.errors import ValidationError
+from pharmacy.models import ShoppingSource
 from pharmacy.services.product_service import ProductForm, ProductService
 from pharmacy.services.shopping_service import ShoppingService
 from pharmacy.utils.dates import format_user_date
@@ -311,7 +312,7 @@ class DataService:
             return
         quantity = _cell_text(record.get("quantity")) or "1"
         name = _cell_text(record.get("name"))
-        self._shopping.add_manual(user_id, name, quantity)
+        self._shopping.add_manual(user_id, name, quantity, source=ShoppingSource.IMPORT)
 
     @staticmethod
     def _read_xlsx(

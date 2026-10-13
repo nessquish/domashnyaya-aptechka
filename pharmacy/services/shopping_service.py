@@ -44,6 +44,7 @@ class ShoppingService:
         quantity: str = "1",
         unit: str = DEFAULT_UNIT,
         product_id: Optional[int] = None,
+        source: str = ShoppingSource.MANUAL,
     ) -> ShoppingItem:
         """Добавляет в список покупок позицию, введённую вручную.
 
@@ -54,6 +55,7 @@ class ShoppingService:
             unit: Единица измерения (по умолчанию «шт.»).
             product_id: Товар аптечки, выбранный в подсказках при вводе названия:
                 по нему у позиции появляется ссылка на карточку.
+            source: Откуда позиция (см. models.ShoppingSource).
 
         Returns:
             Добавленная позиция.
@@ -75,7 +77,7 @@ class ShoppingService:
             existing = self._items.find_open_for_product(user_id, product_id)
             if existing is not None:
                 return self._increase(user_id, existing, amount)
-        return self._add(user_id, name, amount, unit, ShoppingSource.MANUAL, product_id)
+        return self._add(user_id, name, amount, unit, source, product_id)
 
     def add_from_product(
         self,

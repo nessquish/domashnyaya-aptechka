@@ -184,6 +184,7 @@ class ShoppingSource:
     KIT = "kit"  # из таблицы «Моя аптечка»
     CARD = "card"  # из карточки товара
     HOME = "home"  # с главной страницы
+    IMPORT = "import"  # из файла Excel или CSV при импорте
 
 
 @dataclass(frozen=True)

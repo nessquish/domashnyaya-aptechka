@@ -39,6 +39,7 @@ SOURCE_LABELS = {
     ShoppingSource.KIT: "Моя аптечка",
     ShoppingSource.CARD: "Карточка товара",
     ShoppingSource.HOME: "Главная",
+    ShoppingSource.IMPORT: "Импортировано",
 }
 COLUMNS = (
     Column("", fixed=44),

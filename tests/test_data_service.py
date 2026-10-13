@@ -239,6 +239,7 @@ class TemplateTest(DataTestCase):
         self.assertEqual(
             {(i.name, i.quantity) for i in items}, {("Пластыри", 3), ("Бинт", 1)}
         )
+        self.assertEqual({i.source for i in items}, {"import"})
 
     def test_unknown_template_format_is_rejected(self):
         with self.assertRaises(ValidationError):
