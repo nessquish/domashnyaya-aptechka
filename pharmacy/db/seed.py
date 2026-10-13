@@ -6,6 +6,7 @@
     python -m pharmacy.db.seed --bulk 1000  # плюс 1000 товаров для проверки скорости
     python -m pharmacy.db.seed --full       # демо-пользователь со всеми видами данных
     python -m pharmacy.db.seed --reset      # удалить файл базы и создать заново
+    python -m pharmacy.db.seed --refill --full  # заново заполнить демо-аккаунт
 """
 
 import argparse
@@ -14,6 +15,7 @@ from datetime import date, timedelta
 from typing import Dict, Optional, Sequence
 
 from pharmacy.db.connection import Database
+from pharmacy.db.seed_data import MORE_PRODUCTS, more_history, more_shopping
 from pharmacy.utils.security import hash_password
 
 DEMO_LOGIN = "nessquish"
@@ -98,25 +100,38 @@ def _add_products(conn, user_id: int, categories: Dict[str, int], rows) -> Dict:
     return ids
 
 
-def seed_demo(db: Database) -> Optional[int]:
+def seed_demo(db: Database, refill: bool = False) -> Optional[int]:
     """Добавляет демо-пользователя, его товары, список покупок и историю.
 
     Args:
         db: Менеджер базы данных с уже созданной схемой.
+        refill: Если демо-пользователь уже есть, стереть его данные и пароль
+            и заполнить заново (другие аккаунты не затрагиваются).
 
     Returns:
-        Идентификатор созданного пользователя или None, если демо-пользователь
-        уже есть в базе (повторный запуск ничего не дублирует).
+        Идентификатор пользователя или None, если демо-пользователь уже есть
+        в базе и ``refill`` не задан (повторный запуск ничего не дублирует).
     """
-    if db.fetch_one("SELECT id FROM users WHERE login = ?", (DEMO_LOGIN,)):
+    existing = db.fetch_one("SELECT id FROM users WHERE login = ?", (DEMO_LOGIN,))
+    if existing and not refill:
         return None
     categories = _category_ids(db)
     with db.transaction() as conn:
-        user_id = conn.execute(
-            "INSERT INTO users (login, username, email, password_hash)"
-            " VALUES (?, ?, ?, ?)",
-            (DEMO_LOGIN, DEMO_USERNAME, DEMO_EMAIL, hash_password(DEMO_PASSWORD)),
-        ).lastrowid
+        if existing:
+            user_id = existing["id"]
+            for table in ("shopping_list", "notifications", "history", "products"):
+                conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+            conn.execute(
+                "UPDATE users SET username = ?, email = ?, password_hash = ?"
+                " WHERE id = ?",
+                (DEMO_USERNAME, DEMO_EMAIL, hash_password(DEMO_PASSWORD), user_id),
+            )
+        else:
+            user_id = conn.execute(
+                "INSERT INTO users (login, username, email, password_hash)"
+                " VALUES (?, ?, ?, ?)",
+                (DEMO_LOGIN, DEMO_USERNAME, DEMO_EMAIL, hash_password(DEMO_PASSWORD)),
+            ).lastrowid
         product_ids = _add_products(conn, user_id, categories, DEMO_PRODUCTS)
         conn.executemany(
             "INSERT INTO shopping_list (user_id, product_id, name, quantity, unit,"
@@ -459,7 +474,9 @@ def seed_full(db: Database, user_id: int) -> bool:
         )
     }
     with db.transaction() as conn:
-        ids.update(_add_products(conn, user_id, categories, FULL_PRODUCTS))
+        ids.update(
+            _add_products(conn, user_id, categories, FULL_PRODUCTS + MORE_PRODUCTS)
+        )
         conn.executemany(
             "INSERT INTO shopping_list (user_id, product_id, name, quantity, unit,"
             " source, is_bought, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -475,7 +492,7 @@ def seed_full(db: Database, user_id: int) -> bool:
                     _timestamp(ago, clock),
                 )
                 for name, quantity, unit, source, bought, linked, ago, clock in (
-                    FULL_SHOPPING
+                    FULL_SHOPPING + tuple(more_shopping())
                 )
             ],
         )
@@ -484,7 +501,9 @@ def seed_full(db: Database, user_id: int) -> bool:
             " created_at) VALUES (?, ?, ?, ?, ?)",
             [
                 (user_id, ids.get(product), action, text, _timestamp(ago, clock))
-                for action, product, text, ago, clock in FULL_HISTORY
+                for action, product, text, ago, clock in (
+                    FULL_HISTORY + tuple(more_history())
+                )
             ],
         )
     NotificationService(db).refresh(user_id)
@@ -551,6 +570,11 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     parser.add_argument(
         "--reset", action="store_true", help="удалить файл базы и создать заново"
     )
+    parser.add_argument(
+        "--refill",
+        action="store_true",
+        help="стереть данные демо-аккаунта и заполнить его заново (база остаётся)",
+    )
     args = parser.parse_args(argv)
 
     db = Database()
@@ -559,14 +583,15 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         print(f"База {db.path} удалена")
     db.init_schema()
 
-    user_id = seed_demo(db)
+    user_id = seed_demo(db, refill=args.refill)
     if user_id is None:
         print("Демо-пользователь уже есть в базе")
         user_id = db.fetch_one("SELECT id FROM users WHERE login = ?", (DEMO_LOGIN,))[
             "id"
         ]
     else:
-        print(f"Создан демо-пользователь {DEMO_LOGIN} (пароль: {DEMO_PASSWORD})")
+        action = "заполнен заново" if args.refill else "создан"
+        print(f"Демо-пользователь {DEMO_LOGIN} {action} (пароль: {DEMO_PASSWORD})")
     if args.full:
         if seed_full(db, user_id):
             print("Добавлен полный набор тестовых данных")
