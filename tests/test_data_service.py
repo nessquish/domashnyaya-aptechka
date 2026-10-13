@@ -170,15 +170,15 @@ class TemplateTest(DataTestCase):
         path = self.folder / "t.xlsx"
         self.services.data.write_template(path, "xlsx")
         book = load_workbook(path)
-        self.assertEqual(book.sheetnames, ["Шаблон", "Подсказки"])
-        sheet = book["Шаблон"]
-        self.assertEqual(sheet["A2"].value, "Название")
-        self.assertEqual(sheet["I2"].value, "Товар")
-        self.assertNotIn("Дата добавления", [c.value for c in sheet[2]])
-        hints = [row[3].value for row in book["Подсказки"].iter_rows()]
+        self.assertEqual(book.sheetnames, ["Правила", "Моя аптечка", "Список покупок"])
+        kit = book["Моя аптечка"]
+        self.assertEqual(kit["A2"].value, "Название")
+        self.assertNotIn("Дата добавления", [c.value for c in kit[2]])
+        self.assertEqual(book["Список покупок"]["A2"].value, "Товар")
+        names = [row[2].value for row in book["Правила"].iter_rows(min_row=2)]
         self.assertEqual(
             {c.name for c in self.services.products.list_categories()},
-            set(hints[1:5]),
+            set(names[:4]),
         )
 
     def test_filled_excel_template_imports_products_and_shopping(self):
@@ -188,7 +188,7 @@ class TemplateTest(DataTestCase):
         path = self.folder / "t.xlsx"
         self.services.data.write_template(path, "xlsx")
         book = load_workbook(path)
-        sheet = book["Шаблон"]
+        sheet = book["Моя аптечка"]
         rows = (
             ("Йод", "Лекарства", 2, "фл.", datetime(2030, 5, 17), "Шкаф"),
             ("Вата", "Нет такой", 1, "шт.", None, None),
@@ -196,8 +196,9 @@ class TemplateTest(DataTestCase):
         for row, values in enumerate(rows, start=3):
             for column, value in enumerate(values, start=1):
                 sheet.cell(row, column, value)
-        sheet["I3"], sheet["J3"] = "Пластыри", 3
-        sheet["I4"] = "Бинт"
+        shopping = book["Список покупок"]
+        shopping["A3"], shopping["B3"] = "Пластыри", 3
+        shopping["A4"] = "Бинт"
         book.save(path)
         other = self.add_user("boris")
         result = self.services.data.import_products(other, path)

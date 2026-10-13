@@ -32,8 +32,10 @@ COLUMNS: Dict[str, str] = {
     "note": "Примечание",
 }
 TEMPLATE_XLSX = Path(__file__).resolve().parent.parent / "assets" / "template.xlsx"
-SHOPPING_TITLE = "Товар"  # с этого столбца в шаблоне начинается список покупок
-HEADER_SEARCH_ROWS = 5  # в шаблоне над заголовками есть строка с названиями таблиц
+KIT_SHEET = "Моя аптечка"  # листы шаблона
+SHOPPING_SHEET = "Список покупок"
+SHOPPING_TITLE = "Товар"  # на листе покупок это название позиции
+HEADER_SEARCH_ROWS = 5  # над заголовками шаблона есть строка с названием таблицы
 
 
 def _norm(title: object) -> str:
@@ -42,6 +44,41 @@ def _norm(title: object) -> str:
 
 
 _BY_TITLE = {_norm(title): key for key, title in COLUMNS.items()}
+
+
+def _table_records(rows: List[tuple]) -> List[Dict[str, object]]:
+    """Строки таблицы листа как словари «ключ столбца -> значение».
+
+    Заголовки ищутся в первых строках листа. Если их нет, таблицы нет.
+    """
+    keys_by_title = {**_BY_TITLE, _norm(SHOPPING_TITLE): "name"}
+
+    def keys_of(row: tuple) -> List[Optional[str]]:
+        return [
+            keys_by_title.get(_norm(cell)) if cell is not None else None for cell in row
+        ]
+
+    header_at = next(
+        (
+            index
+            for index, row in enumerate(rows[:HEADER_SEARCH_ROWS])
+            if sum(key is not None for key in keys_of(row)) >= 2
+        ),
+        None,
+    )
+    if header_at is None:
+        return []
+    keys = keys_of(rows[header_at])
+    records = []
+    for number, raw in enumerate(rows[header_at + 1 :], start=header_at + 2):
+        record = {
+            key: value
+            for key, value in zip(keys, raw)
+            if key is not None and value is not None
+        }
+        if record:
+            records.append({**record, "_row": number})
+    return records
 
 
 def _cell_text(value: object) -> str:
@@ -253,54 +290,24 @@ class DataService:
     def _read_xlsx(
         path: Path,
     ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
-        """Читает файл Excel (первый лист): товары и позиции списка покупок.
+        """Читает файл Excel: товары и позиции списка покупок.
 
-        Строка заголовков ищется в первых строках листа: в шаблоне над ней стоят
-        названия таблиц. Столбцы с «Товар» и правее относятся к списку покупок.
+        В шаблоне товары лежат на листе «Моя аптечка», покупки на листе
+        «Список покупок». В остальных файлах товары берутся с первого листа.
         """
         from openpyxl import load_workbook
 
         book = load_workbook(path, read_only=True, data_only=True)
         try:
-            rows = list(book.active.iter_rows(values_only=True))
+            sheets = {
+                sheet.title: list(sheet.iter_rows(values_only=True))
+                for sheet in book.worksheets
+            }
         finally:
             book.close()  # иначе Windows держит файл открытым
-        header_at = next(
-            (
-                index
-                for index, row in enumerate(rows[:HEADER_SEARCH_ROWS])
-                if sum(_norm(cell) in _BY_TITLE for cell in row if cell is not None)
-                >= 2
-            ),
-            None,
-        )
-        if header_at is None:
-            return [], []
-        header = [_norm(cell) if cell is not None else "" for cell in rows[header_at]]
-        split = (
-            header.index(_norm(SHOPPING_TITLE))
-            if _norm(SHOPPING_TITLE) in header
-            else len(header)
-        )
-        kit_keys = [_BY_TITLE.get(title) for title in header[:split]]
-        shop_keys = [
-            "name" if title == _norm(SHOPPING_TITLE) else _BY_TITLE.get(title)
-            for title in header[split:]
-        ]
-        kit: List[Dict[str, object]] = []
-        wanted: List[Dict[str, object]] = []
-        for number, raw in enumerate(rows[header_at + 1 :], start=header_at + 2):
-            for keys, values, target in (
-                (kit_keys, raw[:split], kit),
-                (shop_keys, raw[split:], wanted),
-            ):
-                record = {
-                    key: value
-                    for key, value in zip(keys, values)
-                    if key is not None and value is not None
-                }
-                if record:
-                    target.append({**record, "_row": number})
+        first = next(iter(sheets.values()), [])
+        kit = _table_records(sheets.get(KIT_SHEET, first))
+        wanted = _table_records(sheets.get(SHOPPING_SHEET, []))
         return kit, wanted
 
     @staticmethod
