@@ -32,10 +32,10 @@ KIT = ("Название", "Категория", "Количество", "Ед.�
 KIT += ("Место хранения",)
 SHOPPING = ("Товар", "Количество")
 
-TITLE_FILL = "B3A2C7"
-HEAD_FILL = "CCC1DA"
-ODD_FILL = "E6E0EC"
 EVEN_FILL = "FFFFFF"
+# Цвета таблицы: (название, заголовки, нечётные строки).
+PURPLE = ("B3A2C7", "CCC1DA", "E6E0EC")
+BLUE = ("93CDDD", "B7DEE8", "DBEEF4")
 
 RULES = (
     ("ПРАВИЛА ЗАПОЛНЕНИЯ", True),
@@ -73,28 +73,29 @@ def letter(column: int) -> str:
     return chr(ord("A") + column - 1)
 
 
-def add_table(sheet, first: int, title: str, headers) -> None:
+def add_table(sheet, first: int, title: str, headers, colors=PURPLE) -> None:
+    title_fill, head_fill, odd_fill = colors
     last = first + len(headers) - 1
     sheet.merge_cells(start_row=1, start_column=first, end_row=1, end_column=last)
     for column in range(first, last + 1):
         cell = sheet.cell(1, column)
-        cell.fill, cell.border = solid(TITLE_FILL), BOX
+        cell.fill, cell.border = solid(title_fill), BOX
     top = sheet.cell(1, first, title)
     top.font = Font(bold=True)
     top.alignment = Alignment(horizontal="center", vertical="center")
     for offset, text in enumerate(headers):
         cell = sheet.cell(2, first + offset, text)
         cell.font = Font(bold=True)
-        cell.fill, cell.border = solid(HEAD_FILL), BOX
+        cell.fill, cell.border = solid(head_fill), BOX
         cell.alignment = Alignment(horizontal="center", vertical="center")
     for row in range(3, PRE_ROWS + 1):
-        color = ODD_FILL if row % 2 else EVEN_FILL
+        color = odd_fill if row % 2 else EVEN_FILL
         for column in range(first, last + 1):
             cell = sheet.cell(row, column)
             cell.fill, cell.border = solid(color), BOX
     area = f"{letter(first)}{PRE_ROWS + 1}:{letter(last)}{LAST_ROW}"
     has_data = f"COUNTA(${letter(first)}{PRE_ROWS + 1}:${letter(last)}{PRE_ROWS + 1})>0"
-    for color, parity in ((ODD_FILL, 1), (EVEN_FILL, 0)):
+    for color, parity in ((odd_fill, 1), (EVEN_FILL, 0)):
         rule = FormulaRule(
             formula=[f"AND({has_data},MOD(ROW(),2)={parity})"],
             fill=solid(color),
@@ -162,7 +163,7 @@ def build() -> None:
     add_prompts(kit, KIT_PROMPTS)
 
     shopping = book.create_sheet("Список покупок")
-    add_table(shopping, 1, "СПИСОК ПОКУПОК", SHOPPING)
+    add_table(shopping, 1, "СПИСОК ПОКУПОК", SHOPPING, BLUE)
     shopping.column_dimensions["A"].width = 30
     shopping.column_dimensions["B"].width = 14
     add_prompts(shopping, SHOPPING_PROMPTS)
