@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from pharmacy.errors import ValidationError
 from pharmacy.services.container import build_services
@@ -245,6 +246,22 @@ class TemplateTest(DataTestCase):
     def test_unknown_template_format_is_rejected(self):
         with self.assertRaises(ValidationError):
             self.services.data.write_template(self.folder / "t.json", "json")
+
+    def test_template_replaces_existing_and_read_only_file(self):
+        for fmt in ("xlsx", "csv"):
+            path = self.folder / f"shablon.{fmt}"
+            path.write_text("старое", encoding="utf-8")
+            path.chmod(0o444)  # файл только для чтения
+            self.services.data.write_template(path, fmt)
+            self.assertNotEqual(path.read_bytes()[:6], "старое".encode()[:6])
+
+    def test_busy_file_gives_clear_message(self):
+        path = self.folder / "busy.xlsx"
+        path.write_text("x", encoding="utf-8")
+        with mock.patch.object(Path, "open", side_effect=PermissionError):
+            with self.assertRaises(ValidationError) as caught:
+                self.services.data.write_template(path, "xlsx")
+        self.assertIn("открыт в другой программе", caught.exception.message)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import csv
 import json
 import re
 import shutil
+import stat
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -138,6 +139,31 @@ class ImportResult:
         return "\n".join(lines)
 
 
+def free_target(path: Union[str, Path]) -> None:
+    """Готовит существующий файл к замене.
+
+    Снимает отметку «только чтение». Если файл занят другой программой
+    (например, открыт в Excel), понятно говорит об этом.
+
+    Raises:
+        ValidationError: Если файл нельзя перезаписать.
+    """
+    path = Path(path)
+    if not path.is_file():
+        return
+    try:
+        path.chmod(stat.S_IREAD | stat.S_IWRITE)
+    except OSError:
+        pass
+    try:
+        path.open("ab").close()
+    except OSError:
+        raise ValidationError(
+            "Файл нельзя заменить: он открыт в другой программе (например, "
+            "в Excel) или защищён от записи. Закройте его и сохраните снова."
+        )
+
+
 class DataService:
     """Работа с данными пользователя целиком: файлы и сброс."""
 
@@ -178,6 +204,7 @@ class DataService:
             raise ValidationError("Выберите формат файла: CSV, JSON или Excel")
         rows = self._rows(user_id)
         path = Path(path)
+        free_target(path)
         if fmt == "json":
             path.write_text(
                 json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -245,6 +272,7 @@ class DataService:
         """
         if fmt not in ("csv", "xlsx"):
             raise ValidationError("Шаблон есть для файлов CSV и Excel")
+        free_target(path)
         if fmt == "xlsx":
             shutil.copyfile(TEMPLATE_XLSX, path)
             return
