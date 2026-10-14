@@ -27,7 +27,7 @@
 - [`Aptechka-Demo.exe`](exe/Aptechka-Demo.exe) — демо-версия: сразу есть аккаунт
   `nessquish` (пароль `demo12345`) со всеми данными.
 
-Те же файлы лежат в [Releases](https://github.com/nessquish/aptechka/releases).
+Те же файлы лежат в [Releases](https://github.com/nessquish/domashnyaya-aptechka/releases).
 Если Windows выдаст предупреждение SmartScreen, нажмите «Подробнее» → «Выполнить в любом
 случае» (программа не подписана). Остальное в этом разделе нужно, чтобы запускать
 программу из исходного кода.

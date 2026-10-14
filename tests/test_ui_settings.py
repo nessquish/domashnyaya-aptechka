@@ -384,7 +384,8 @@ class AboutTest(SettingsTestCase):
         ) as opener:
             page.guide_button.invoke()
         self.assertIn(
-            "github.com/nessquish/aptechka", opener.call_args[0][0].toString()
+            "github.com/nessquish/domashnyaya-aptechka",
+            opener.call_args[0][0].toString(),
         )
 
 
