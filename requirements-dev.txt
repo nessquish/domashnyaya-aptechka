@@ -5,5 +5,5 @@ pre-commit
 pyinstaller
 # coverage.py измеряет покрытие кода тестами
 coverage
-# Pillow собирает многоразмерный значок .ico при сборке Aptechka.exe
+# Pillow собирает многоразмерный значок .ico при сборке domashnyaya-aptechka.exe
 Pillow>=10.0

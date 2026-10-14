@@ -1,13 +1,13 @@
-"""Сборка программы в один файл Aptechka.exe.
+"""Сборка программы в один файл domashnyaya-aptechka.exe.
 
 Запуск из папки проекта::
 
     .venv\\Scripts\\python.exe packaging\\build_exe.py
 
-Результат: ``dist/Aptechka.exe``. С ключом ``--demo`` собирается
-``dist/Aptechka-Demo.exe``: при первом запуске в нём уже есть тестовый аккаунт
-``nessquish`` (пароль ``demo12345``) со всеми видами данных, а данные лежат
-отдельно в ``%LOCALAPPDATA%\\Моя аптечка (демо)``.
+Результат: ``dist/domashnyaya-aptechka.exe``. С ключом ``--demo`` собирается
+``dist/domashnyaya-aptechka-demo.exe``: при первом запуске в нём уже есть
+тестовый аккаунт ``nessquish`` (пароль ``demo12345``) со всеми видами данных,
+а данные лежат отдельно в ``%LOCALAPPDATA%\\Моя аптечка (демо)``.
 
 Готовый файл можно копировать на другой компьютер с Windows: Python там не
 нужен. Данные программы (база и настройки) лежат в ``%LOCALAPPDATA%\\Моя аптечка``
@@ -32,7 +32,7 @@ ICON_FILE = BUILD_DIR / "aptechka.ico"
 ENTRY = ROOT / "packaging" / "launcher.py"
 FONTS = ROOT / "pharmacy" / "ui" / "assets" / "fonts"
 ASSETS = ROOT / "pharmacy" / "assets"
-EXE_NAME = "Aptechka"
+EXE_NAME = "domashnyaya-aptechka"
 DEMO_FLAG_FILE = BUILD_DIR / "demo.flag"
 
 
@@ -61,7 +61,7 @@ def build(demo: bool = False) -> None:
             str(ENTRY),
             *extra,
             "--name",
-            EXE_NAME + ("-Demo" if demo else ""),
+            EXE_NAME + ("-demo" if demo else ""),
             "--onefile",
             "--noconsole",
             "--clean",

@@ -22,9 +22,9 @@
 
 В папке [`exe`](exe) лежат собранные программы для Windows, скачайте и запустите:
 
-- [`Aptechka.exe`](exe/Aptechka.exe) — чистая версия, при первом запуске нужно
+- [`domashnyaya-aptechka.exe`](exe/domashnyaya-aptechka.exe) — чистая версия, при первом запуске нужно
   зарегистрироваться;
-- [`Aptechka-Demo.exe`](exe/Aptechka-Demo.exe) — демо-версия: сразу есть аккаунт
+- [`domashnyaya-aptechka-demo.exe`](exe/domashnyaya-aptechka-demo.exe) — демо-версия: сразу есть аккаунт
   `nessquish` (пароль `demo12345`) со всеми данными.
 
 Те же файлы лежат в [Releases](https://github.com/nessquish/domashnyaya-aptechka/releases).
@@ -561,7 +561,7 @@ PATH» можно игнорировать.
 | Как запущена программа | Где лежат данные |
 |---|---|
 | из исходников (`python -m pharmacy`) | папка `data` в папке проекта |
-| собранный `Aptechka.exe` | `%LOCALAPPDATA%\Моя аптечка\data` |
+| собранный `domashnyaya-aptechka.exe` | `%LOCALAPPDATA%\Моя аптечка\data` |
 
 В папке:
 
@@ -593,7 +593,7 @@ PATH» можно игнорировать.
 
 ## 3. Сборка программы в .exe
 
-Собирается один файл `dist/Aptechka.exe` (около 50 МБ). Python на другом компьютере не
+Собирается один файл `dist/domashnyaya-aptechka.exe` (около 50 МБ). Python на другом компьютере не
 нужен.
 
 ```powershell
@@ -601,7 +601,7 @@ PATH» можно игнорировать.
 .venv\Scripts\python.exe packaging\build_exe.py
 ```
 
-С ключом `--demo` собирается `dist/Aptechka-Demo.exe` с готовым тестовым аккаунтом
+С ключом `--demo` собирается `dist/domashnyaya-aptechka-demo.exe` с готовым тестовым аккаунтом
 `nessquish` (пароль `demo12345`); его данные лежат отдельно в
 `%LOCALAPPDATA%\Моя аптечка (демо)`.
 
