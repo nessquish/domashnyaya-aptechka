@@ -128,7 +128,6 @@ SEARCH_INDEX: Tuple[SearchEntry, ...] = (
     _setting(
         "Значки в меню", APPEARANCE, _APPEARANCE, "иконки", "меню", "боковая панель"
     ),
-    _setting("Акцентный цвет", APPEARANCE, _APPEARANCE, "цвет", "палитра"),
     # Уведомления.
     _setting(
         "Уведомления", NOTIFICATIONS, _NOTIFY, "включить", "выключить", "оповещения"

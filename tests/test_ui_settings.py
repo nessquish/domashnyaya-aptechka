@@ -119,13 +119,6 @@ class AppearanceTest(SettingsTestCase):
         self.assertIsNone(self.shell.sidebar.item(sections.HOME)._icon)
         self.assertEqual(self.page.section, APPEARANCE)
 
-    def test_accent_color_is_marked_as_coming_soon(self):
-        from pharmacy.ui.widgets.badge import Badge
-        from tests.qt_helpers import find_all
-
-        self.section(APPEARANCE)
-        self.assertIn("Скоро", [b.text for b in find_all(self.page, Badge)])
-
 
 class NotificationsTest(SettingsTestCase):
     def test_flags_are_saved(self):

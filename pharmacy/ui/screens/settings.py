@@ -275,9 +275,6 @@ class SettingsScreen(QWidget):
         )
         row.addWidget(self._icons)
 
-        row, _ = self._row("Акцентный цвет", "Выбор из нескольких готовых цветов")
-        row.addWidget(Badge("Скоро", "gray"))
-
     @staticmethod
     def _scale_text(mode: str) -> str:
         if mode == "manual":
