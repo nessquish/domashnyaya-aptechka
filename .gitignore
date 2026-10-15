@@ -20,3 +20,6 @@ dist/
 # Отчёт покрытия тестов (coverage run -m unittest)
 .coverage
 htmlcov/
+
+# Сборка документации Sphinx
+docs/_build/

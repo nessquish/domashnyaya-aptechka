@@ -103,7 +103,12 @@ def _qt_theme() -> Optional[str]:
 def restart_program() -> None:
     """Запускает программу заново (масштаб считается заново) и закрывает эту."""
     os.environ.pop(scaling.ENV_NAME, None)
-    args = [] if getattr(sys, "frozen", False) else ["-m", "pharmacy"]
+    frozen = getattr(sys, "frozen", False)
+    if frozen:
+        # Новый .exe должен распаковать себя заново: иначе он берёт временную
+        # папку старого процесса, а та удаляется при его закрытии.
+        os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    args = [] if frozen else ["-m", "pharmacy"]
     QProcess.startDetached(sys.executable, args)
     QApplication.quit()
 
